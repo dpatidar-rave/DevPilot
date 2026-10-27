@@ -1,0 +1,16 @@
+.DS_Store
+.pytest_cache
+.pytest_tmp
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.sqlite
+*.sqlite3
+
+backend/.venv/
+backend/.pytest_tmp/
+backend/data/
+
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
