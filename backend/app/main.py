@@ -28,6 +28,8 @@ from app.db.migrate import init_database
 from app.db.session import create_db_engine, create_session_factory
 from app.local_policy import loopback_origin_aliases
 from app.logging_config import configure_logging, log_event
+from app.services.model_gateway import ModelGateway
+from app.services.review import ReviewService, mark_interrupted
 from app.services.settings_store import overlay_settings
 
 # FastAPI enables tracing, metrics, and logs unless this is set. Export stays off.
@@ -47,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     engine = create_db_engine(active.database_url)
     sessions = create_session_factory(engine)
     effective = overlay_settings(active, sessions)
+    mark_interrupted(sessions)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -68,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = sessions
     app.state.settings = effective
+    app.state.review_service = ReviewService(ModelGateway(effective), sessions, effective)
 
     @app.middleware("http")
     async def log_and_protect(

@@ -1,6 +1,6 @@
 # DevPilot
 
-DevPilot is a local-first code review and release-quality assistant for a Magento 2 / Adobe Commerce agency. Phase 1 registers a local Git working tree and shows its diffs. It does not run reviews yet.
+DevPilot is a local-first code review and release-quality assistant for a Magento 2 / Adobe Commerce agency. Phase 2 reviews a selected diff with a local Ollama model. Findings are AI suggestions, not guaranteed results and not test failures.
 
 Source code, git diffs, findings, and the database stay on this machine. Inference is reserved for a locally running Ollama model. There is no hosted-model fallback.
 
@@ -12,7 +12,7 @@ Source code, git diffs, findings, and the database stay on this machine. Inferen
 - The only model provider is Ollama. The endpoint must resolve to a loopback address.
 - Hosted model names are rejected. `qwen2.5-coder:7b` is the default on a 16 GB Apple silicon Mac.
 - A model at 20B parameters or larger is an optional experiment. Set `large_model_confirmed=true` only after accepting the extra memory use.
-- The app does not call Ollama until a review starts. Phase 1 never starts a review, so it never calls Ollama.
+- The app does not call Ollama until you start a review. Health and settings never probe the model.
 - The app does not download models. If the selected model is missing, pull it yourself.
 - Git inspection is read-only. The app does not commit, push, merge, reset, clean, or switch branches. Git commands are argument lists pinned to a registered work tree. Hooks, aliases, and external diff programs are not used.
 - Commands, patches, and shell text from a model or from repository files are untrusted data and are not executed.
@@ -56,11 +56,27 @@ Press Ctrl+C to stop both processes. If the UI cannot reach the API, the Overvie
 
 ## Repository explorer
 
-Open `http://127.0.0.1:5173/repositories` and register an absolute path to a Git working tree. The UI lists the current branch, latest commit, local branches, staged changes, unstaged changes, committed differences against a base branch, and untracked files. File diffs use syntax highlighting and mark added and deleted lines. The selection you save is stored in SQLite for a later review. This build does not start that review.
+Open `http://127.0.0.1:5173/repositories` and register an absolute path to a Git working tree. The UI lists the current branch, latest commit, local branches, staged changes, unstaged changes, committed differences against a base branch, and untracked files. File diffs use syntax highlighting and mark added and deleted lines. The selection you save is stored in SQLite. Open it from the repository page to start a local review.
 
 Magento is detected from `composer.json` and `app/etc/di.xml`. PHP and Magento versions appear only when those files contain an exact version, not a range.
 
 Credential-shaped files and generated directories are listed and are not opened. Manual steps and the safety rules are in [docs/repository-explorer.md](docs/repository-explorer.md).
+
+## Local review
+
+Open `http://127.0.0.1:5173/reviews/new`. Choose a registered repository, a base branch, and the changed files. DevPilot builds a manifest, skips secrets, binaries, generated files, and ignore patterns, and sends each chunk only to the Ollama server configured in `DEVPILOT_OLLAMA_ENDPOINT`. The model name comes from `DEVPILOT_MODEL`. The review screen shows that name, the comparison, progress, and a cancel button.
+
+A finding is an AI suggestion. The screen says so. It is not a deterministic test failure, and it is not guaranteed to be correct. Quotes that were not in the diff sent to the model are dropped. Complete diffs are not stored. Prompts and model responses are not written to the log.
+
+Install and download the model yourself before the first review. DevPilot will not pull it and will not switch to a hosted model:
+
+```bash
+brew install ollama
+brew services start ollama
+ollama pull qwen2.5-coder:7b
+```
+
+The default model is `qwen2.5-coder:7b`, with context `8192`, temperature `0.1`, and max output `1800`. A 20B model still requires the memory confirmation in Settings. If Ollama is stopped or the model is missing, the review fails with a local error and a retry. Details are in [docs/review-engine.md](docs/review-engine.md).
 
 ## Configuration
 
@@ -107,7 +123,7 @@ Run the commands from the repository root unless the command says `cd frontend`.
 
 **Settings reject the model or endpoint.** Use an Ollama tag such as `qwen2.5-coder:7b` and an endpoint such as `http://127.0.0.1:11434`. `gpt-4o`, `claude`, and `gemini` names are rejected. A 20B or larger tag requires the memory confirmation.
 
-**Ollama is not running.** Phase 1 does not call it. The Overview page shows availability as "Not checked". When a later phase starts a review, a connection error is shown with a retry. Install and start Ollama locally. The app will not silently use another provider.
+**Ollama is not running.** The Overview page shows availability as "Not checked" until you start a review. A review then shows that the local endpoint could not be reached, with a retry. Install and start Ollama locally. The app will not silently use another provider.
 
 **A repository path is rejected.** The path must be absolute and must be the root of a Git working tree. A missing folder, a plain directory, and a `.git` file are rejected. The message stays generic and does not echo secrets.
 
@@ -134,4 +150,4 @@ scripts/setup.sh         install
 scripts/start.sh         run the local UI and API
 ```
 
-More detail is in [docs/architecture.md](docs/architecture.md), [docs/api-contracts.md](docs/api-contracts.md), [docs/schema.md](docs/schema.md), and [docs/repository-explorer.md](docs/repository-explorer.md).
+More detail is in [docs/architecture.md](docs/architecture.md), [docs/api-contracts.md](docs/api-contracts.md), [docs/schema.md](docs/schema.md), [docs/repository-explorer.md](docs/repository-explorer.md), and [docs/review-engine.md](docs/review-engine.md).

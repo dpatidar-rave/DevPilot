@@ -44,6 +44,45 @@ class FindingContract(BaseModel):
         return self
 
 
+class ReviewStart(BaseModel):
+    """Start a review with the configured local model. The model is not an input."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str = Field(min_length=1, max_length=36)
+    base_ref: str = Field(min_length=1, max_length=200)
+    paths: list[str] = Field(min_length=1, max_length=40)
+
+
+class SkippedFile(BaseModel):
+    path: str
+    reason: str
+
+
+class FindingResponse(BaseModel):
+    """An AI suggestion. It is never a deterministic test result."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    stable_key: str
+    file_path: str
+    scope: str
+    start_line: int
+    end_line: int
+    severity: Severity
+    category: str
+    title: str
+    explanation: str
+    evidence: str
+    remediation: str
+    confidence: float
+    uncertain: bool
+    needs_human_verification: Literal[True] = True
+    evidence_checked: bool
+    origin: Literal["ai_suggestion"] = "ai_suggestion"
+
+
 class ReviewRecord(BaseModel):
     id: str
     project_id: str
@@ -56,7 +95,24 @@ class ReviewRecord(BaseModel):
     started_at: datetime | None
     finished_at: datetime | None
     error_code: str | None
+    error_message: str | None = None
     finding_count: int
+    summary: str = ""
+    limitations: list[str] = Field(default_factory=list)
+    skipped_files: list[SkippedFile] = Field(default_factory=list)
+    reviewed_files: list[str] = Field(default_factory=list)
+    files_reviewed: int = 0
+    files_skipped: int = 0
+    chunks_total: int = 0
+    chunks_completed: int = 0
+    temperature: float | None = None
+    max_output_tokens: int | None = None
+    timeout_seconds: float | None = None
+    keep_alive: str | None = None
+
+
+class ReviewDetail(ReviewRecord):
+    findings: list[FindingResponse] = Field(default_factory=list)
 
 
 class ReviewList(BaseModel):

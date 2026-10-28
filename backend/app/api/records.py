@@ -6,12 +6,11 @@ from app.api.repositories import project_summary
 from app.schemas.project import ProjectList
 from app.schemas.quality import QualityCheckList, QualityCheckRecord
 from app.schemas.release import ReleaseReportList, ReleaseReportRecord
-from app.schemas.review import ReviewList, ReviewRecord
+from app.schemas.review import ReviewList
 from app.services.persistence import (
     list_projects,
     list_quality_checks,
     list_release_reports,
-    list_reviews,
 )
 from app.services.repository import RepositoryService
 
@@ -27,28 +26,7 @@ def get_projects(request: Request) -> ProjectList:
 
 @router.get("/reviews", response_model=ReviewList)
 def get_reviews(request: Request) -> ReviewList:
-    rows = list_reviews(request.app.state.session_factory)
-    return ReviewList(
-        items=[
-            ReviewRecord.model_validate(
-                {
-                    "id": row.id,
-                    "project_id": row.project_id,
-                    "status": row.status,
-                    "base_ref": row.base_ref,
-                    "head_ref": row.head_ref,
-                    "model": row.model_name,
-                    "context_length": row.context_length,
-                    "created_at": row.created_at,
-                    "started_at": row.started_at,
-                    "finished_at": row.finished_at,
-                    "error_code": row.error_code,
-                    "finding_count": row.finding_count,
-                }
-            )
-            for row in rows
-        ]
-    )
+    return ReviewList(items=request.app.state.review_service.list_records())
 
 
 @router.get("/quality-checks", response_model=QualityCheckList)

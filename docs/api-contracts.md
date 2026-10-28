@@ -79,14 +79,31 @@ The list items include `branch`, `detached`, `dirty`, `magento`, and `inspection
 
 ### `PUT /api/projects/{id}/selection`
 
-Body: `{ "paths": ["app/code/Example.php"], "base": "main" }`. Only paths visible in the current change set are stored. A path outside that set is HTTP 422, and the response does not echo the path. The saved list is for a later review. This route does not start one.
+Body: `{ "paths": ["app/code/Example.php"], "base": "main" }`. Only paths visible in the current change set are stored. A path outside that set is HTTP 422, and the response does not echo the path.
+
+## Implemented in Phase 2
+
+The model name and Ollama origin come from local settings. A request cannot choose a provider or a model.
+
+### `POST /api/reviews`
+
+Body: `{ "project_id", "base_ref", "paths" }`. HTTP 201 returns the review, including `model`, temperature, context, the comparison, files reviewed, files skipped, limitations, and findings. A provider or model field is HTTP 422. A missing repository is HTTP 404. A second review of the same repository while one is running is HTTP 409.
+
+### `GET /api/reviews` and `GET /api/reviews/{id}`
+
+The list is the local history. The detail adds findings. Every finding has `origin: "ai_suggestion"` and `needs_human_verification: true`. `evidence_checked` is true only when the quote and line range were present in the chunk sent to the model.
+
+### `POST /api/reviews/{id}/cancel`
+
+Marks a running review cancelled. The in-flight local request is discarded when it returns. Cancelling a finished review is HTTP 409.
+
+`error_code` is a short local code such as `timeout`, `model_missing`, `unavailable`, `busy`, or `interrupted`. `error_message` tells the user to retry locally. The body does not include the prompt or the model response.
 
 ## Defined for later phases, not mounted
 
 These Pydantic models live in `backend/app/schemas/` and reject extra fields. No route accepts them yet.
 
-- `ReviewCreate` accepts `project_id`, `base_ref`, and `head_ref`. It does not accept a provider or a model override.
 - `FindingContract` requires `uncertain: true` when `confidence` is below 0.5.
 - `QualityCheckCreate` and `ReleaseReportCreate` describe later runs.
 
-Creating a review, cancelling a review, running a quality check, generating a release report, and running the benchmark are not implemented.
+Running a quality check, generating a release report, and running the benchmark are not implemented. Those checks are separate from AI suggestions.

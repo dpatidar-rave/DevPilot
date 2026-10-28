@@ -88,7 +88,7 @@ describe('repository page', () => {
     expect(screen.getByRole('heading', { name: 'Unstaged changes' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Committed differences' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Untracked files' })).toBeInTheDocument()
-    expect(screen.getByText(/does not start a review/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /review the saved selection/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /base.php/i }))
 

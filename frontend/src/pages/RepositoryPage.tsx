@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 
 import { ConnectionError } from '@/components/ConnectionError'
 import { DiffView } from '@/components/DiffView'
@@ -142,8 +142,14 @@ export function RepositoryPage() {
               {saving ? 'Saving…' : 'Save review selection'}
             </Button>
             <p className="text-sm text-muted-foreground">
-              Selected files are stored locally. This build does not start a review.
+              Selected files are stored locally. A review sends only those files to the local model.
             </p>
+            <Link
+              className="text-sm text-primary"
+              to={`/reviews/new?project=${projectId}&base=${encodeURIComponent(changes.state.data.base ?? '')}`}
+            >
+              Review the saved selection
+            </Link>
           </div>
           {message && <p role="status" className="text-sm">{message}</p>}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

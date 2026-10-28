@@ -1,6 +1,6 @@
 # Architecture
 
-DevPilot is a local-first review assistant. Phase 1 adds read-only Git inspection on top of the Phase 0 shell. It does not run a review and it does not call Ollama.
+DevPilot is a local-first review assistant. Phase 2 reviews a selected diff through the local Ollama HTTP API. It does not call a hosted model, and it does not treat model output as a test result.
 
 ```mermaid
 flowchart LR
@@ -19,8 +19,8 @@ flowchart LR
 | Service | Responsibility |
 | --- | --- |
 | `RepositoryService` | Registers a local work tree, inspects branches and status, and reads diffs. Every `git` invocation is an allowlisted argument list pinned to that work tree. `prepare()` still validates an argument list without executing it. |
-| `ReviewService` | Depends on the `InferenceClient` protocol, not on a concrete model. It does not start a review. |
-| `ModelGateway` | Builds a local Ollama client with proxy use and redirects disabled. Construction and `open_client()` do not send a request. |
+| `ReviewService` | Builds a manifest, chunks the selected diff, calls `InferenceClient`, checks every finding against that diff, and stores the summary. |
+| `ModelGateway` | Sends `POST /api/chat` to the configured loopback Ollama origin. Construction and `open_client()` do not send a request. Redirects and proxy environment variables stay off. |
 | `QualityCheckService` | Reads stored quality-check rows. |
 | `ReleaseReportService` | Reads stored release-report rows. |
 | `Persistence` helpers | Ping SQLite and list stored rows. Nothing is seeded. |
@@ -39,8 +39,9 @@ A later model is selected by changing `DEVPILOT_MODEL` or the settings page. `Re
 
 ## What this build does not do
 
-- It does not start a review, chunk a diff for a model, or score findings.
-- It does not call Ollama, pull a model, or fall back to a hosted model.
+- It does not pull a model, search the web, or fall back to a hosted model.
+- It does not let the model edit source or execute tools.
+- It does not present an AI suggestion as a deterministic test failure.
 - It does not execute shell text, patches, or text returned by a model or by repository files.
 - It does not commit, push, merge, reset, clean, checkout, or switch branches.
 - It does not insert sample findings.

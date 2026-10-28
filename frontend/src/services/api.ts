@@ -133,10 +133,50 @@ export interface ReviewRecord {
   id: string
   project_id: string
   status: string
+  base_ref: string | null
+  head_ref: string | null
   model: string
+  context_length: number
   created_at: string
   finding_count: number
   error_code: string | null
+  error_message: string | null
+  summary: string
+  limitations: string[]
+  skipped_files: { path: string; reason: string }[]
+  reviewed_files: string[]
+  files_reviewed: number
+  files_skipped: number
+  chunks_total: number
+  chunks_completed: number
+  temperature: number | null
+  max_output_tokens: number | null
+  timeout_seconds: number | null
+  keep_alive: string | null
+}
+
+export interface ReviewFinding {
+  id: string
+  stable_key: string
+  file_path: string
+  scope: string
+  start_line: number
+  end_line: number
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info'
+  category: string
+  title: string
+  explanation: string
+  evidence: string
+  remediation: string
+  confidence: number
+  uncertain: boolean
+  needs_human_verification: true
+  evidence_checked: boolean
+  origin: 'ai_suggestion'
+}
+
+export interface ReviewDetail extends ReviewRecord {
+  findings: ReviewFinding[]
 }
 
 export interface QualityCheckRecord {
@@ -317,6 +357,29 @@ export async function listReviews(baseUrl?: string): Promise<ReviewRecord[]> {
   return parseList(
     await request('/api/reviews', { method: 'GET' }, baseUrl ?? defaultBaseUrl()),
     parseReview,
+  )
+}
+
+export async function startReview(
+  projectId: string,
+  base: string,
+  paths: string[],
+): Promise<ReviewDetail> {
+  return parseReviewDetail(
+    await request('/api/reviews', {
+      method: 'POST',
+      body: JSON.stringify({ project_id: projectId, base_ref: base, paths }),
+    }),
+  )
+}
+
+export async function readReview(reviewId: string): Promise<ReviewDetail> {
+  return parseReviewDetail(await request(`/api/reviews/${encodeURIComponent(reviewId)}`))
+}
+
+export async function cancelReview(reviewId: string): Promise<ReviewDetail> {
+  return parseReviewDetail(
+    await request(`/api/reviews/${encodeURIComponent(reviewId)}/cancel`, { method: 'POST' }),
   )
 }
 
@@ -566,11 +629,92 @@ function parseReview(value: unknown): ReviewRecord {
     id: value.id,
     project_id: typeof value.project_id === 'string' ? value.project_id : '',
     status: typeof value.status === 'string' ? value.status : 'pending',
+    base_ref: typeof value.base_ref === 'string' ? value.base_ref : null,
+    head_ref: typeof value.head_ref === 'string' ? value.head_ref : null,
     model: typeof value.model === 'string' ? value.model : '',
+    context_length: numberField(value.context_length),
     created_at: typeof value.created_at === 'string' ? value.created_at : '',
     finding_count: numberField(value.finding_count),
     error_code: typeof value.error_code === 'string' ? value.error_code : null,
+    error_message: typeof value.error_message === 'string' ? value.error_message : null,
+    summary: typeof value.summary === 'string' ? value.summary : '',
+    limitations: stringListOrEmpty(value.limitations),
+    skipped_files: parseSkipped(value.skipped_files),
+    reviewed_files: stringListOrEmpty(value.reviewed_files),
+    files_reviewed: numberField(value.files_reviewed),
+    files_skipped: numberField(value.files_skipped),
+    chunks_total: numberField(value.chunks_total),
+    chunks_completed: numberField(value.chunks_completed),
+    temperature: typeof value.temperature === 'number' ? value.temperature : null,
+    max_output_tokens: typeof value.max_output_tokens === 'number' ? value.max_output_tokens : null,
+    timeout_seconds: typeof value.timeout_seconds === 'number' ? value.timeout_seconds : null,
+    keep_alive: typeof value.keep_alive === 'string' ? value.keep_alive : null,
   }
+}
+
+function parseReviewDetail(value: unknown): ReviewDetail {
+  const review = parseReview(value)
+  if (!isRecord(value) || !Array.isArray(value.findings)) {
+    throw new ApiError('The local backend returned an unreadable review.')
+  }
+  return { ...review, findings: value.findings.map(parseFinding) }
+}
+
+function parseFinding(value: unknown): ReviewFinding {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.title !== 'string') {
+    throw new ApiError('The local backend returned an unreadable finding.')
+  }
+  if (value.origin !== 'ai_suggestion' || value.needs_human_verification !== true) {
+    throw new ApiError('A finding was not labeled as an AI suggestion.')
+  }
+  const severity = value.severity
+  if (
+    severity !== 'critical' &&
+    severity !== 'high' &&
+    severity !== 'medium' &&
+    severity !== 'low' &&
+    severity !== 'info'
+  ) {
+    throw new ApiError('The local backend returned an unreadable finding.')
+  }
+  return {
+    id: value.id,
+    stable_key: typeof value.stable_key === 'string' ? value.stable_key : value.id,
+    file_path: typeof value.file_path === 'string' ? value.file_path : '',
+    scope: typeof value.scope === 'string' ? value.scope : '',
+    start_line: numberField(value.start_line),
+    end_line: numberField(value.end_line),
+    severity,
+    category: typeof value.category === 'string' ? value.category : '',
+    title: value.title,
+    explanation: typeof value.explanation === 'string' ? value.explanation : '',
+    evidence: typeof value.evidence === 'string' ? value.evidence : '',
+    remediation: typeof value.remediation === 'string' ? value.remediation : '',
+    confidence: numberField(value.confidence),
+    uncertain: value.uncertain === true,
+    needs_human_verification: true,
+    evidence_checked: value.evidence_checked === true,
+    origin: 'ai_suggestion',
+  }
+}
+
+function parseSkipped(value: unknown): { path: string; reason: string }[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.flatMap((item) => {
+    if (!isRecord(item) || typeof item.path !== 'string') {
+      return []
+    }
+    return [{ path: item.path, reason: typeof item.reason === 'string' ? item.reason : '' }]
+  })
+}
+
+function stringListOrEmpty(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.filter((item): item is string => typeof item === 'string')
 }
 
 function parseQuality(value: unknown): QualityCheckRecord {

@@ -43,6 +43,24 @@ class Review(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     finding_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    timeout_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    keep_alive: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    files_reviewed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    files_skipped: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    chunks_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    chunks_completed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    limitations_json: Mapped[str] = mapped_column(
+        Text, nullable=False, default="[]", server_default="[]"
+    )
+    skipped_json: Mapped[str] = mapped_column(
+        Text, nullable=False, default="[]", server_default="[]"
+    )
+    reviewed_json: Mapped[str] = mapped_column(
+        Text, nullable=False, default="[]", server_default="[]"
+    )
 
 
 class ReviewFinding(Base):
@@ -90,4 +108,16 @@ class ReviewFinding(Base):
         nullable=False,
         server_default="uncertain",
     )
+    evidence: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    remediation: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    verification: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="needs_review",
+        server_default="needs_review",
+    )
+    stable_key: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="", server_default=""
+    )
+    scope: Mapped[str] = mapped_column(String(32), nullable=False, default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
