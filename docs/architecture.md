@@ -1,6 +1,6 @@
 # Architecture
 
-DevPilot is a local-first review assistant. Phase 2 reviews a selected diff through the local Ollama HTTP API. Phase 3 runs confirmed PHP and Magento commands. Phase 4 combines those results with human decisions into a release assessment. It does not call a hosted model, and it does not treat model output as approval to ship.
+DevPilot is a local-first review assistant. Phase 2 reviews a selected diff through the local Ollama HTTP API. Phase 3 runs confirmed PHP and Magento commands. Phase 4 combines those results with human decisions into a release assessment. Phase 5 hardens the local boundaries and checks the workflow without downloading a model. It does not call a hosted model, and it does not treat model output as approval to ship. The application is not declared production-ready. The limits are in [docs/hardening.md](hardening.md).
 
 ```mermaid
 flowchart LR
@@ -43,6 +43,8 @@ A later model is selected by changing `DEVPILOT_MODEL` or the settings page. `Re
 - The database URL must be a SQLite file. Remote databases are rejected.
 - Interactive API docs are off so the browser does not load a documentation CDN.
 - Logs are JSON on disk, mode `0600`. Secret-shaped text, prompts, diffs, and model responses are redacted or dropped.
+- Git is resolved to an absolute `git` binary outside the registered work tree. A timeout or an oversized read kills that process group.
+- When the stored Alembic revision is not the current head, startup copies `data/devpilot.db` to `data/devpilot.db.bak` (mode `0600`) before upgrading. A database that is already at head is not copied again.
 
 ## What this build does not do
 
@@ -56,3 +58,5 @@ A later model is selected by changing `DEVPILOT_MODEL` or the settings page. `Re
 - It does not treat a release assessment as approval. The stored report status stays `draft`. `ready_for_human_approval` means a person can decide.
 - It does not insert sample findings.
 - It does not read `.env`, `app/etc/env.php`, private keys, or other credential-shaped files, and it does not load generated directories into the diff viewer.
+- It does not authenticate callers. Any process on this machine that can open the loopback port can call the API.
+- It does not treat a repository comment as trusted. A finding is kept only when its quote appears in the diff that was sent. A hostile comment that the model quotes can still become a suggestion a person must judge.

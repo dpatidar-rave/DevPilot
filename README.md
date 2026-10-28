@@ -92,6 +92,12 @@ Open `http://127.0.0.1:5173/releases/new`. Choose a registered repository and a 
 
 The best result DevPilot can show is **Ready for human approval**. That is not approval. A waiver is listed with its reason and reviewer, and it is not a passed check. How to read the three readiness values is in [docs/release-readiness.md](docs/release-readiness.md).
 
+## Local hardening
+
+Phase 5 checks the local boundaries and runs the full workflow on a temporary Magento-like repository. The automated test uses a scripted local model response and a scripted quality-check runner. It does not download a model and it does not contact Ollama.
+
+The application is not production-ready. The audit, the results that were actually observed, the privacy checklist, the remaining limits, and the next steps are in [docs/hardening.md](docs/hardening.md).
+
 ## Configuration
 
 Settings live in `.env` and, after you save the settings page, in the `app_settings` table. Environment variables are the defaults. Saved settings override the model fields on the next start.
@@ -147,6 +153,8 @@ Run the commands from the repository root unless the command says `cd frontend`.
 
 **SQLite will not open.** Check that `data/` is writable. The health response stays generic and does not print the filesystem path. The local log records the error type.
 
+**A schema upgrade fails.** Stop the app. If `data/devpilot.db.bak` exists, it is the copy taken before that upgrade. With the app stopped, replace `data/devpilot.db` with that copy, then start again. The log does not contain the database contents.
+
 **Python or Node is too old.** Setup requires Python 3.11+ and Node.js 20+.
 
 ## Layout
@@ -164,4 +172,4 @@ scripts/setup.sh         install
 scripts/start.sh         run the local UI and API
 ```
 
-More detail is in [docs/architecture.md](docs/architecture.md), [docs/api-contracts.md](docs/api-contracts.md), [docs/schema.md](docs/schema.md), [docs/repository-explorer.md](docs/repository-explorer.md), [docs/review-engine.md](docs/review-engine.md), [docs/quality-checks.md](docs/quality-checks.md), and [docs/release-readiness.md](docs/release-readiness.md).
+More detail is in [docs/architecture.md](docs/architecture.md), [docs/api-contracts.md](docs/api-contracts.md), [docs/schema.md](docs/schema.md), [docs/repository-explorer.md](docs/repository-explorer.md), [docs/review-engine.md](docs/review-engine.md), [docs/quality-checks.md](docs/quality-checks.md), [docs/release-readiness.md](docs/release-readiness.md), and [docs/hardening.md](docs/hardening.md).

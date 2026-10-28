@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { DiffView } from '@/components/DiffView'
+import { DiffView, sanitizeHighlight } from '@/components/DiffView'
 
 function codeText(text: string) {
   return (_content: string, element: Element | null) =>
@@ -42,5 +42,29 @@ describe('diff view', () => {
 
     expect(screen.getByText(/does not read it/i)).toBeInTheDocument()
     expect(screen.queryByText('secret')).not.toBeInTheDocument()
+  })
+
+  it('escapes markup that is not a highlight span', () => {
+    const html = sanitizeHighlight(
+      '<span class="hljs-keyword">echo</span><img src=x onerror="alert(1)">',
+    )
+    expect(html).toContain('<span class="hljs-keyword">')
+    expect(html).not.toContain('<img')
+    expect(html).toContain('&lt;img')
+    const attribute = sanitizeHighlight('<span class="hljs-keyword" onclick="alert(1)">')
+    expect(attribute).not.toContain('<span')
+    expect(attribute).toContain('&lt;span')
+
+    const { container } = render(
+      <DiffView
+        language="php"
+        binary={false}
+        truncated={false}
+        skipped={null}
+        lines={[{ kind: 'add', text: '<script>alert(1)</script>', old_line: null, new_line: 1 }]}
+      />,
+    )
+    expect(container.querySelector('script')).toBeNull()
+    expect(screen.getByText(codeText('<script>alert(1)</script>'))).toBeInTheDocument()
   })
 })

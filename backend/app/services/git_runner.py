@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import select
+import shutil
+import signal
 import subprocess
 import time
 from dataclasses import dataclass
@@ -49,6 +51,7 @@ class GitRunner:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             shell=False,
+            start_new_session=True,
         )
         try:
             stdout, stderr, code = _capture(process)
@@ -59,13 +62,28 @@ class GitRunner:
         return GitOutput(code, stdout, stderr)
 
 
+def resolve_git(repo: Path) -> str:
+    """Use the system git binary. A git executable inside the work tree is refused."""
+    found = shutil.which("git")
+    if found is None:
+        raise GitError("Git could not be started on this machine.")
+    try:
+        binary = Path(found).resolve()
+        root = repo.resolve()
+    except OSError as exc:
+        raise GitError("Git could not be started on this machine.") from exc
+    if binary == root or _is_inside(binary, root) or binary.name != "git":
+        raise GitError("Git could not be started on this machine.")
+    return binary.as_posix()
+
+
 def _argv(repo: Path, args: list[str]) -> list[str]:
     work_tree = repo.as_posix()
     overrides: list[str] = []
     for value in sorted(allowed_git_config()):
         overrides.extend(["-c", value])
     return [
-        "git",
+        resolve_git(repo),
         "--no-optional-locks",
         "--git-dir",
         f"{work_tree}/.git",
@@ -101,8 +119,7 @@ def _capture(process: subprocess.Popen[bytes]) -> tuple[bytes, bytes, int]:
     while streams:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            process.kill()
-            process.wait(timeout=2)
+            _stop(process)
             raise GitError("Git took too long and was stopped.")
         readable, _, _ = select.select(streams, [], [], remaining)
         if not readable:
@@ -117,13 +134,39 @@ def _capture(process: subprocess.Popen[bytes]) -> tuple[bytes, bytes, int]:
             if stream is process.stdout:
                 if len(stdout) + len(chunk) > _STDOUT_LIMIT:
                     too_large = True
-                    process.kill()
+                    _stop(process)
                     streams.clear()
                     break
                 stdout.extend(chunk)
             elif len(stderr) < _STDERR_LIMIT:
                 stderr.extend(chunk[: _STDERR_LIMIT - len(stderr)])
-    code = process.wait(timeout=2)
+    if process.poll() is None:
+        code = process.wait(timeout=2)
+    else:
+        code = process.returncode or 0
     if too_large:
         raise GitError("Git output was too large to show.")
     return bytes(stdout), bytes(stderr), code
+
+
+def _stop(process: subprocess.Popen[bytes]) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        try:
+            process.kill()
+        except (ProcessLookupError, OSError):
+            return
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=2)
+
+
+def _is_inside(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True

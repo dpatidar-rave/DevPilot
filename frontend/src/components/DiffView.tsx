@@ -96,9 +96,20 @@ function DiffRow({ line, language }: { line: DiffLine; language: string | null }
       <span className="inline-block w-4 select-none font-semibold" aria-label={label}>
         {marker}
       </span>
-      <code dangerouslySetInnerHTML={{ __html: highlight(line.text, language) }} />
+      <code dangerouslySetInnerHTML={{ __html: sanitizeHighlight(highlight(line.text, language)) }} />
     </li>
   )
+}
+
+const HIGHLIGHT_SPAN = /^<span class="(?:[A-Za-z_][\w-]*)(?: [A-Za-z_][\w-]*)*">$/
+
+export function sanitizeHighlight(html: string): string {
+  return html.replace(/<\/?[^>]+>/g, (tag) => {
+    if (tag === '</span>' || HIGHLIGHT_SPAN.test(tag)) {
+      return tag
+    }
+    return escapeHtml(tag)
+  })
 }
 
 function highlight(text: string, language: string | null): string {

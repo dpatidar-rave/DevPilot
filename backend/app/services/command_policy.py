@@ -95,7 +95,7 @@ def validate_git_argv(argv: list[str]) -> list[str]:
     it can create a branch. Global options are limited to the flags the repository
     service builds itself.
     """
-    if len(argv) < 2 or argv[0] != "git":
+    if len(argv) < 2 or not _is_git_executable(argv[0]):
         raise CommandRejectedError("Only git inspection commands are allowed.")
     allowed_config = allowed_git_config()
     index = 1
@@ -153,6 +153,14 @@ def _reject_argument_tail(args: list[str]) -> None:
             separator = True
             continue
         _reject_shell(argument, allow_newline=separator)
+
+
+def _is_git_executable(value: str) -> bool:
+    if value == "git":
+        return True
+    if not value.startswith("/") or value.endswith("/"):
+        return False
+    return value.rsplit("/", 1)[-1] == "git"
 
 
 def _reject_shell(argument: str, *, allow_newline: bool) -> None:
