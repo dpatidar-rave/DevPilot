@@ -119,11 +119,40 @@ Body: `{ "tool", "confirmed": true, "review_id": null }`. `confirmed` must be tr
 
 Lists stored rows, newest first. `project_id` is optional.
 
+## Implemented in Phase 4
+
+A release assessment reads stored reviews and quality checks. It does not call Ollama and it does not start a command. The client cannot send `readiness`. A saved report's `status` is `draft`.
+
+### `GET /api/projects/{id}/release-assessment?review_id=`
+
+Computes the current assessment and does not store it. The body includes `readiness`, `statement`, `blockers`, `warnings`, `passed`, `waivers`, `missing`, `checklist`, `findings`, `quality`, `model`, `base_ref`, `head_sha`, `repository_head_sha`, `dirty`, and `generated_at`.
+
+### `PUT /api/reviews/{review_id}/findings/{finding_id}/decision`
+
+Body: `{ "decision": "dismissed" | "confirmed" | "waived", "reason": "", "reviewer": "" }`. A critical waiver or critical dismissal is rejected without a reason and a reviewer. The response is the refreshed assessment.
+
+### `PUT /api/reviews/{review_id}/checklist/{item_key}`
+
+Body: `{ "status": "pending" | "passed" | "failed" | "waived" | "not_applicable", "reason": "", "reviewer": "" }`. `passed`, `waived`, and `not_applicable` require a reason and a reviewer. `critical_high` accepts only `pending`, because each finding is decided on its own.
+
+### `POST /api/release-reports`
+
+Body: `{ "project_id", "review_id" }`. Stores a new snapshot. The response is that snapshot plus `id`, `title`, and `status`. `status` is `draft`.
+
+### `GET /api/release-reports/{id}`
+
+Returns the stored snapshot.
+
+### `GET /api/release-reports/{id}/markdown` and `GET /api/release-reports/{id}/json`
+
+Return the Markdown and JSON saved with that snapshot. A later page load does not rebuild them.
+
+`GET /api/release-reports` still lists stored rows. Each item includes `readiness` and `head_sha` when the row has them.
+
 ## Defined for later phases, not mounted
 
 These Pydantic models live in `backend/app/schemas/` and reject extra fields. No route accepts them yet.
 
 - `FindingContract` requires `uncertain: true` when `confidence` is below 0.5.
-- `ReleaseReportCreate` describes a later release report.
 
-Generating a release report and running the benchmark are not implemented. Quality-check rows stay separate from AI suggestions.
+The benchmark is not implemented. Quality-check rows stay separate from AI suggestions, and a release report does not merge them into one defect list.

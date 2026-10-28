@@ -86,6 +86,12 @@ The result shows the exact command, working directory, start time, duration, exi
 
 Approved project scripts can still have side effects. DevPilot does not install Composer packages, edit project configuration, or run deployment commands such as `setup:upgrade` or static-content deploy. The allowlist and the manual steps are in [docs/quality-checks.md](docs/quality-checks.md).
 
+## Release readiness
+
+Open `http://127.0.0.1:5173/releases/new`. Choose a registered repository and a completed review. The page shows blockers, warnings, passed checks, waivers, missing evidence, the model configuration, and the Git commit identifiers. Save the report when you want a snapshot. Download that snapshot as Markdown or JSON from the report page.
+
+The best result DevPilot can show is **Ready for human approval**. That is not approval. A waiver is listed with its reason and reviewer, and it is not a passed check. How to read the three readiness values is in [docs/release-readiness.md](docs/release-readiness.md).
+
 ## Configuration
 
 Settings live in `.env` and, after you save the settings page, in the `app_settings` table. Environment variables are the defaults. Saved settings override the model fields on the next start.
@@ -149,7 +155,7 @@ Run the commands from the repository root unless the command says `cd frontend`.
 backend/app/api          HTTP routes for health, settings, and the repository explorer
 backend/app/services     repository, review, model, quality, release, persistence
 backend/app/models       SQLAlchemy tables
-backend/app/schemas      API contracts, including routes not mounted yet
+backend/app/schemas      API contracts
 backend/app/db           SQLite engine and Alembic runner
 backend/tests            pytest
 frontend/src             React shell
@@ -158,4 +164,4 @@ scripts/setup.sh         install
 scripts/start.sh         run the local UI and API
 ```
 
-More detail is in [docs/architecture.md](docs/architecture.md), [docs/api-contracts.md](docs/api-contracts.md), [docs/schema.md](docs/schema.md), [docs/repository-explorer.md](docs/repository-explorer.md), [docs/review-engine.md](docs/review-engine.md), and [docs/quality-checks.md](docs/quality-checks.md).
+More detail is in [docs/architecture.md](docs/architecture.md), [docs/api-contracts.md](docs/api-contracts.md), [docs/schema.md](docs/schema.md), [docs/repository-explorer.md](docs/repository-explorer.md), [docs/review-engine.md](docs/review-engine.md), [docs/quality-checks.md](docs/quality-checks.md), and [docs/release-readiness.md](docs/release-readiness.md).

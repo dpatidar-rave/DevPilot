@@ -23,6 +23,8 @@ EXPECTED_TABLES = {
     "quality_check_runs",
     "quality_commands",
     "release_reports",
+    "finding_decisions",
+    "release_checklist_decisions",
     "app_settings",
     "review_file_selections",
 }

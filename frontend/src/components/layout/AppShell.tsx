@@ -6,6 +6,8 @@ import { RepositoriesPage } from '@/pages/RepositoriesPage'
 import { RepositoryPage } from '@/pages/RepositoryPage'
 import { QualityPage } from '@/pages/QualityPage'
 import { ReleasesPage } from '@/pages/ReleasesPage'
+import { ReleaseDetailPage } from '@/pages/ReleaseDetailPage'
+import { ReleaseEditorPage } from '@/pages/ReleaseEditorPage'
 import { ReviewDetailPage } from '@/pages/ReviewDetailPage'
 import { ReviewSetupPage } from '@/pages/ReviewSetupPage'
 import { ReviewsPage } from '@/pages/ReviewsPage'
@@ -25,6 +27,8 @@ export function AppShell() {
             <Route path="/reviews/new" element={<ReviewSetupPage />} />
             <Route path="/reviews/:reviewId" element={<ReviewDetailPage />} />
             <Route path="/quality" element={<QualityPage />} />
+            <Route path="/releases/new" element={<ReleaseEditorPage />} />
+            <Route path="/releases/:reportId" element={<ReleaseDetailPage />} />
             <Route path="/releases" element={<ReleasesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

@@ -1,6 +1,6 @@
 # Architecture
 
-DevPilot is a local-first review assistant. Phase 2 reviews a selected diff through the local Ollama HTTP API. Phase 3 runs confirmed PHP and Magento commands. It does not call a hosted model, and it does not treat model output as a test result.
+DevPilot is a local-first review assistant. Phase 2 reviews a selected diff through the local Ollama HTTP API. Phase 3 runs confirmed PHP and Magento commands. Phase 4 combines those results with human decisions into a release assessment. It does not call a hosted model, and it does not treat model output as approval to ship.
 
 ```mermaid
 flowchart LR
@@ -16,6 +16,9 @@ flowchart LR
   API --> QUALITY["QualityCheckService"]
   QUALITY --> CHECK["allowlisted argv"]
   QUALITY --> DB
+  API --> RELEASE["ReleaseReportService"]
+  RELEASE --> DB
+  RELEASE --> REPO
 ```
 
 ## Services
@@ -26,7 +29,7 @@ flowchart LR
 | `ReviewService` | Builds a manifest, chunks the selected diff, calls `InferenceClient`, checks every finding against that diff, and stores the summary. |
 | `ModelGateway` | Sends `POST /api/chat` to the configured loopback Ollama origin. Construction and `open_client()` do not send a request. Redirects and proxy environment variables stay off. |
 | `QualityCheckService` | Detects project tools, stores an allowlisted argument list, and runs it after an explicit confirmation. |
-| `ReleaseReportService` | Reads stored release-report rows. |
+| `ReleaseReportService` | Builds a readiness assessment from a stored review, quality-check rows, and human decisions. It reads Git to record the current commit. It does not call Ollama and it does not run a quality command. |
 | `Persistence` helpers | Ping SQLite and list stored rows. Nothing is seeded. |
 
 A later model is selected by changing `DEVPILOT_MODEL` or the settings page. `ReviewService` does not import Ollama.
@@ -50,5 +53,6 @@ A later model is selected by changing `DEVPILOT_MODEL` or the settings page. `Re
 - It does not install Composer packages, change project configuration, or run destructive and deployment commands.
 - It does not execute shell text, patches, or text returned by a model or by repository files.
 - It does not commit, push, merge, reset, clean, checkout, or switch branches.
+- It does not treat a release assessment as approval. The stored report status stays `draft`. `ready_for_human_approval` means a person can decide.
 - It does not insert sample findings.
 - It does not read `.env`, `app/etc/env.php`, private keys, or other credential-shaped files, and it does not load generated directories into the diff viewer.

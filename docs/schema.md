@@ -1,6 +1,6 @@
 # SQLite schema
 
-Alembic revisions `0001_initial`, `0002_selections`, `0003_review_engine`, and `0004_quality_checks` create the tables below. The application applies them on startup. The database file is `data/devpilot.db` unless `DEVPILOT_DATABASE_URL` points at another local SQLite file. The file mode is `0600`.
+Alembic revisions `0001_initial`, `0002_selections`, `0003_review_engine`, `0004_quality_checks`, and `0005_release_readiness` create the tables below. The application applies them on startup. The database file is `data/devpilot.db` unless `DEVPILOT_DATABASE_URL` points at another local SQLite file. The file mode is `0600`.
 
 ## projects
 
@@ -35,10 +35,18 @@ One confirmed check, or a skipped check whose tool was missing. `status` remains
 
 ## release_reports
 
-A future release report. `status` is `draft`, `ready`, or `archived`.
+One stored assessment. `status` stays `draft` when DevPilot generates the row. `readiness` is `blocked`, `needs_review`, or `ready_for_human_approval`. `report_json` and `report_markdown` are the snapshot that the export routes return. `head_sha` is the commit recorded on the review. `repository_head_sha` is the repository HEAD at generation time. `model_name` is the model name stored on that review. Generating a report does not set `status` to `ready`.
+
+## finding_decisions
+
+A person's disposition of one finding: `dismissed`, `confirmed`, or `waived`. `reason` and `reviewer_label` are required before a critical waiver or a critical dismissal is stored. The primary key is `finding_id`. Deleting the finding deletes the decision. This table does not change `review_findings.validation_status`.
+
+## release_checklist_decisions
+
+A person's status for one checklist item on one review. The primary key is `review_id` plus `item_key`. `status` is `pending`, `passed`, `failed`, `waived`, or `not_applicable`. `reason` and `reviewer_label` are required for `passed`, `waived`, and `not_applicable`.
 
 ## app_settings
 
 JSON values for the editable model settings: `model_name`, `context_length`, `temperature`, `max_output_tokens`, `timeout_seconds`, `ollama_endpoint`, and `large_model_confirmed`. Keys outside that set are ignored and are not returned by the API. Invalid stored values stop startup instead of falling back to a hosted model.
 
-Registering a repository inserts a `projects` row. Saving a file selection inserts `review_file_selections` rows. Starting a review inserts `reviews` and, when findings pass the evidence check, `review_findings`. Saving a quality command inserts `quality_commands`. Confirming a run inserts `quality_check_runs`. Release reports are still not inserted.
+Registering a repository inserts a `projects` row. Saving a file selection inserts `review_file_selections` rows. Starting a review inserts `reviews` and, when findings pass the evidence check, `review_findings`. Saving a quality command inserts `quality_commands`. Confirming a run inserts `quality_check_runs`. Saving a finding or checklist decision inserts `finding_decisions` or `release_checklist_decisions`. Saving a release report inserts `release_reports` with `status` `draft`.

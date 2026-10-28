@@ -9,9 +9,11 @@ from sqlalchemy import engine_from_config, pool
 from app.db.base import Base
 from app.models import (
     AppSetting,
+    FindingDecision,
     Project,
     QualityCheckRun,
     QualityCommand,
+    ReleaseChecklistDecision,
     ReleaseReport,
     Review,
     ReviewFileSelection,
@@ -20,9 +22,11 @@ from app.models import (
 
 _REGISTERED_MODELS = (
     AppSetting,
+    FindingDecision,
     Project,
     QualityCheckRun,
     QualityCommand,
+    ReleaseChecklistDecision,
     ReleaseReport,
     Review,
     ReviewFileSelection,

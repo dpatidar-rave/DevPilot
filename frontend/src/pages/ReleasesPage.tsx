@@ -1,8 +1,17 @@
+import { Link } from 'react-router-dom'
+
 import { ConnectionError } from '@/components/ConnectionError'
 import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
+import { Button } from '@/components/ui/button'
 import { useLocalResource } from '@/hooks/useLocalResource'
 import { listReleaseReports } from '@/services/api'
+
+const READINESS_LABEL = {
+  blocked: 'Blocked',
+  needs_review: 'Needs review',
+  ready_for_human_approval: 'Ready for human approval',
+} as const
 
 export function ReleasesPage() {
   const reports = useLocalResource(listReleaseReports)
@@ -10,9 +19,13 @@ export function ReleasesPage() {
   return (
     <>
       <PageHeader
+        phase="Phase 4"
         title="Release reports"
-        description="Release reports stored on this machine. Report generation is not part of this build."
+        description="A stored assessment combines the review, quality checks, and human decisions. Saving a report does not approve the release."
       />
+      <Button asChild className="mb-6">
+        <Link to="/releases/new">New release report</Link>
+      </Button>
       {reports.state.status === 'loading' && <p>Reading the local database…</p>}
       {reports.state.status === 'error' && (
         <ConnectionError message={reports.state.message} onRetry={reports.reload} />
@@ -27,8 +40,14 @@ export function ReleasesPage() {
         <ul className="divide-y divide-border rounded-lg border border-border bg-card">
           {reports.state.data.map((report) => (
             <li key={report.id} className="px-5 py-4">
-              <p className="font-medium">{report.title}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{report.status}</p>
+              <Link to={`/releases/${report.id}`} className="font-medium hover:underline">
+                {report.title}
+              </Link>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {report.readiness ? READINESS_LABEL[report.readiness] : 'No readiness stored'}
+                {' · '}
+                Stored as {report.status}
+              </p>
             </li>
           ))}
         </ul>

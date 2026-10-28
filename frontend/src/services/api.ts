@@ -223,10 +223,77 @@ export interface QualityCatalog {
 export interface ReleaseReportRecord {
   id: string
   project_id: string
+  review_id: string | null
   title: string
   status: string
+  readiness: Readiness | null
   note: string | null
+  head_sha: string | null
   created_at: string
+}
+
+export type Readiness = 'blocked' | 'needs_review' | 'ready_for_human_approval'
+export type ChecklistStatus = 'pending' | 'passed' | 'failed' | 'waived' | 'not_applicable'
+
+export interface ReleaseWaiver {
+  text: string
+  reason: string
+  reviewer: string
+}
+
+export interface ChecklistItem {
+  key: string
+  label: string
+  status: ChecklistStatus
+  evidence: string
+  reason: string
+  reviewer: string
+}
+
+export interface FindingDisposition {
+  id: string
+  severity: string
+  title: string
+  file_path: string
+  decision: string
+  reason: string
+  reviewer: string
+}
+
+export interface ReleaseAssessment {
+  readiness: Readiness
+  statement: string
+  blockers: string[]
+  warnings: string[]
+  passed: string[]
+  waivers: ReleaseWaiver[]
+  missing: string[]
+  checklist: ChecklistItem[]
+  findings: FindingDisposition[]
+  quality: { tool: string; result: string }[]
+  model: {
+    name: string
+    context_length: number
+    temperature: number
+    max_output_tokens: number
+    timeout_seconds: number
+  }
+  project_id: string
+  project_name: string
+  review_id: string
+  review_status: string
+  base_ref: string
+  head_sha: string
+  repository_head_sha: string
+  dirty: boolean
+  generated_at: string
+  limitations: string[]
+}
+
+export interface ReleaseReportDetail extends ReleaseAssessment {
+  id: string
+  title: string
+  status: string
 }
 
 export function defaultBaseUrl(): string {
@@ -298,6 +365,28 @@ async function request(path: string, init?: RequestInit, baseUrl = defaultBaseUr
     )
   }
   return response.json() as Promise<unknown>
+}
+
+async function requestText(path: string, baseUrl = defaultBaseUrl()): Promise<string> {
+  const base = assertLocalBaseUrl(baseUrl)
+  let response: Response
+  try {
+    response = await fetch(`${base}${path}`, {
+      cache: 'no-store',
+      credentials: 'omit',
+      headers: { Accept: 'text/markdown, application/json' },
+    })
+  } catch {
+    throw new ApiError(unreachable(base))
+  }
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null)
+    if (isRecord(payload) && typeof payload.detail === 'string' && payload.detail.length < 400) {
+      throw new ApiError(payload.detail)
+    }
+    throw new ApiError(`The local backend returned HTTP ${response.status}.`)
+  }
+  return response.text()
 }
 
 function validationError(payload: unknown): ApiError {
@@ -458,6 +547,72 @@ export async function runQualityCheck(
 
 export async function listReleaseReports(): Promise<ReleaseReportRecord[]> {
   return parseList(await request('/api/release-reports'), parseRelease)
+}
+
+export async function previewRelease(projectId: string, reviewId: string): Promise<ReleaseAssessment> {
+  const query = new URLSearchParams({ review_id: reviewId })
+  return parseAssessment(
+    await request(`/api/projects/${encodeURIComponent(projectId)}/release-assessment?${query}`),
+  )
+}
+
+export async function saveFindingDecision(
+  reviewId: string,
+  findingId: string,
+  decision: string,
+  reason: string,
+  reviewer: string,
+): Promise<ReleaseAssessment> {
+  return parseAssessment(
+    await request(
+      `/api/reviews/${encodeURIComponent(reviewId)}/findings/${encodeURIComponent(findingId)}/decision`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ decision, reason, reviewer }),
+      },
+    ),
+  )
+}
+
+export async function saveChecklistDecision(
+  reviewId: string,
+  itemKey: string,
+  status: ChecklistStatus,
+  reason: string,
+  reviewer: string,
+): Promise<ReleaseAssessment> {
+  return parseAssessment(
+    await request(`/api/reviews/${encodeURIComponent(reviewId)}/checklist/${encodeURIComponent(itemKey)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, reason, reviewer }),
+    }),
+  )
+}
+
+export async function createReleaseReport(projectId: string, reviewId: string): Promise<ReleaseReportDetail> {
+  return parseReleaseDetail(
+    await request('/api/release-reports', {
+      method: 'POST',
+      body: JSON.stringify({ project_id: projectId, review_id: reviewId }),
+    }),
+  )
+}
+
+export async function readReleaseReport(reportId: string): Promise<ReleaseReportDetail> {
+  return parseReleaseDetail(await request(`/api/release-reports/${encodeURIComponent(reportId)}`))
+}
+
+export async function downloadReleaseExport(reportId: string, format: 'markdown' | 'json'): Promise<void> {
+  const text = await requestText(`/api/release-reports/${encodeURIComponent(reportId)}/${format}`)
+  const blob = new Blob([text], {
+    type: format === 'markdown' ? 'text/markdown;charset=utf-8' : 'application/json',
+  })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = format === 'markdown' ? 'release-report.md' : 'release-report.json'
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 function parseHealth(value: unknown): HealthResponse {
@@ -855,11 +1010,134 @@ function parseRelease(value: unknown): ReleaseReportRecord {
   return {
     id: value.id,
     project_id: typeof value.project_id === 'string' ? value.project_id : '',
+    review_id: typeof value.review_id === 'string' ? value.review_id : null,
     title: value.title,
     status: typeof value.status === 'string' ? value.status : 'draft',
+    readiness: readinessOrNull(value.readiness),
     note: typeof value.note === 'string' ? value.note : null,
+    head_sha: typeof value.head_sha === 'string' ? value.head_sha : null,
     created_at: typeof value.created_at === 'string' ? value.created_at : '',
   }
+}
+
+function parseReleaseDetail(value: unknown): ReleaseReportDetail {
+  const assessment = parseAssessment(value)
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.title !== 'string') {
+    throw new ApiError('The local backend returned an unreadable release report.')
+  }
+  return {
+    ...assessment,
+    id: value.id,
+    title: value.title,
+    status: typeof value.status === 'string' ? value.status : 'draft',
+  }
+}
+
+function parseAssessment(value: unknown): ReleaseAssessment {
+  if (!isRecord(value) || !isRecord(value.model) || typeof value.statement !== 'string') {
+    throw new ApiError('The local backend returned an unreadable release report.')
+  }
+  const readiness = readinessOrNull(value.readiness)
+  if (readiness === null) {
+    throw new ApiError('The local backend returned an unreadable release report.')
+  }
+  return {
+    readiness,
+    statement: value.statement,
+    blockers: stringListOrEmpty(value.blockers),
+    warnings: stringListOrEmpty(value.warnings),
+    passed: stringListOrEmpty(value.passed),
+    waivers: Array.isArray(value.waivers) ? value.waivers.map(parseWaiver) : [],
+    missing: stringListOrEmpty(value.missing),
+    checklist: Array.isArray(value.checklist) ? value.checklist.map(parseChecklistItem) : [],
+    findings: Array.isArray(value.findings) ? value.findings.map(parseDisposition) : [],
+    quality: Array.isArray(value.quality) ? value.quality.map(parseQualityEvidence) : [],
+    model: {
+      name: typeof value.model.name === 'string' ? value.model.name : '',
+      context_length: numberField(value.model.context_length),
+      temperature: numberField(value.model.temperature),
+      max_output_tokens: numberField(value.model.max_output_tokens),
+      timeout_seconds: numberField(value.model.timeout_seconds),
+    },
+    project_id: typeof value.project_id === 'string' ? value.project_id : '',
+    project_name: typeof value.project_name === 'string' ? value.project_name : '',
+    review_id: typeof value.review_id === 'string' ? value.review_id : '',
+    review_status: typeof value.review_status === 'string' ? value.review_status : '',
+    base_ref: typeof value.base_ref === 'string' ? value.base_ref : '',
+    head_sha: typeof value.head_sha === 'string' ? value.head_sha : '',
+    repository_head_sha: typeof value.repository_head_sha === 'string' ? value.repository_head_sha : '',
+    dirty: value.dirty === true,
+    generated_at: typeof value.generated_at === 'string' ? value.generated_at : '',
+    limitations: stringListOrEmpty(value.limitations),
+  }
+}
+
+function parseWaiver(value: unknown): ReleaseWaiver {
+  if (!isRecord(value) || typeof value.text !== 'string') {
+    throw new ApiError('The local backend returned an unreadable release report.')
+  }
+  return {
+    text: value.text,
+    reason: typeof value.reason === 'string' ? value.reason : '',
+    reviewer: typeof value.reviewer === 'string' ? value.reviewer : '',
+  }
+}
+
+function parseChecklistItem(value: unknown): ChecklistItem {
+  if (!isRecord(value) || typeof value.key !== 'string' || typeof value.label !== 'string') {
+    throw new ApiError('The local backend returned an unreadable release report.')
+  }
+  const status = checklistStatus(value.status)
+  return {
+    key: value.key,
+    label: value.label,
+    status,
+    evidence: typeof value.evidence === 'string' ? value.evidence : '',
+    reason: typeof value.reason === 'string' ? value.reason : '',
+    reviewer: typeof value.reviewer === 'string' ? value.reviewer : '',
+  }
+}
+
+function parseDisposition(value: unknown): FindingDisposition {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.title !== 'string') {
+    throw new ApiError('The local backend returned an unreadable release report.')
+  }
+  return {
+    id: value.id,
+    severity: typeof value.severity === 'string' ? value.severity : '',
+    title: value.title,
+    file_path: typeof value.file_path === 'string' ? value.file_path : '',
+    decision: typeof value.decision === 'string' ? value.decision : '',
+    reason: typeof value.reason === 'string' ? value.reason : '',
+    reviewer: typeof value.reviewer === 'string' ? value.reviewer : '',
+  }
+}
+
+function parseQualityEvidence(value: unknown): { tool: string; result: string } {
+  if (!isRecord(value) || typeof value.tool !== 'string' || typeof value.result !== 'string') {
+    throw new ApiError('The local backend returned an unreadable release report.')
+  }
+  return { tool: value.tool, result: value.result }
+}
+
+function readinessOrNull(value: unknown): Readiness | null {
+  if (value === 'blocked' || value === 'needs_review' || value === 'ready_for_human_approval') {
+    return value
+  }
+  return null
+}
+
+function checklistStatus(value: unknown): ChecklistStatus {
+  if (
+    value === 'pending' ||
+    value === 'passed' ||
+    value === 'failed' ||
+    value === 'waived' ||
+    value === 'not_applicable'
+  ) {
+    return value
+  }
+  throw new ApiError('The local backend returned an unreadable release report.')
 }
 
 function numberField(value: unknown): number {
