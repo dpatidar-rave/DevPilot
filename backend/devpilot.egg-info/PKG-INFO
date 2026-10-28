@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: devpilot
+Version: 0.1.0
+Summary: Local-first AI code review and release quality assistant.
+Requires-Python: >=3.11
+Requires-Dist: fastapi>=0.115
+Requires-Dist: uvicorn[standard]>=0.32
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: alembic>=1.14
+Requires-Dist: pydantic>=2.10
+Requires-Dist: pydantic-settings>=2.6
+Requires-Dist: httpx>=0.28
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3; extra == "dev"
+Requires-Dist: ruff>=0.8; extra == "dev"
