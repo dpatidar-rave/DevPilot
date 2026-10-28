@@ -1,6 +1,6 @@
 # DevPilot
 
-DevPilot is a local-first code review and release-quality assistant for a Magento 2 / Adobe Commerce agency. Phase 0 is the application shell: a loopback API, a loopback UI, SQLite, and local model settings. It does not run reviews yet.
+DevPilot is a local-first code review and release-quality assistant for a Magento 2 / Adobe Commerce agency. Phase 1 registers a local Git working tree and shows its diffs. It does not run reviews yet.
 
 Source code, git diffs, findings, and the database stay on this machine. Inference is reserved for a locally running Ollama model. There is no hosted-model fallback.
 
@@ -12,9 +12,9 @@ Source code, git diffs, findings, and the database stay on this machine. Inferen
 - The only model provider is Ollama. The endpoint must resolve to a loopback address.
 - Hosted model names are rejected. `qwen2.5-coder:7b` is the default on a 16 GB Apple silicon Mac.
 - A model at 20B parameters or larger is an optional experiment. Set `large_model_confirmed=true` only after accepting the extra memory use.
-- The app does not call Ollama until a review starts. Phase 0 never starts a review, so it never calls Ollama.
+- The app does not call Ollama until a review starts. Phase 1 never starts a review, so it never calls Ollama.
 - The app does not download models. If the selected model is missing, pull it yourself.
-- Git inspection is read-only. The app does not commit, push, merge, reset, clean, or switch branches, and Phase 0 does not run git at all.
+- Git inspection is read-only. The app does not commit, push, merge, reset, clean, or switch branches. Git commands are argument lists pinned to a registered work tree. Hooks, aliases, and external diff programs are not used.
 - Commands, patches, and shell text from a model or from repository files are untrusted data and are not executed.
 - Logs are local JSON files. They redact credentials and drop prompts, diffs, source, and model responses.
 - There is no cloud analytics, telemetry, remote logging, or error reporting. FastAPI's built-in tracing, metrics, and logs are turned off, and the OpenTelemetry exporter is not installed. API docs that would load a CDN are disabled.
@@ -53,6 +53,14 @@ scripts/start.sh
 - API health: `http://127.0.0.1:8000/api/health`
 
 Press Ctrl+C to stop both processes. If the UI cannot reach the API, the Overview page shows the error and a Retry button. That failure stays local. DevPilot will not switch providers.
+
+## Repository explorer
+
+Open `http://127.0.0.1:5173/repositories` and register an absolute path to a Git working tree. The UI lists the current branch, latest commit, local branches, staged changes, unstaged changes, committed differences against a base branch, and untracked files. File diffs use syntax highlighting and mark added and deleted lines. The selection you save is stored in SQLite for a later review. This build does not start that review.
+
+Magento is detected from `composer.json` and `app/etc/di.xml`. PHP and Magento versions appear only when those files contain an exact version, not a range.
+
+Credential-shaped files and generated directories are listed and are not opened. Manual steps and the safety rules are in [docs/repository-explorer.md](docs/repository-explorer.md).
 
 ## Configuration
 
@@ -99,7 +107,9 @@ Run the commands from the repository root unless the command says `cd frontend`.
 
 **Settings reject the model or endpoint.** Use an Ollama tag such as `qwen2.5-coder:7b` and an endpoint such as `http://127.0.0.1:11434`. `gpt-4o`, `claude`, and `gemini` names are rejected. A 20B or larger tag requires the memory confirmation.
 
-**Ollama is not running.** Phase 0 does not call it. The Overview page shows availability as "Not checked". When a later phase starts a review, a connection error is shown with a retry. Install and start Ollama locally. The app will not silently use another provider.
+**Ollama is not running.** Phase 1 does not call it. The Overview page shows availability as "Not checked". When a later phase starts a review, a connection error is shown with a retry. Install and start Ollama locally. The app will not silently use another provider.
+
+**A repository path is rejected.** The path must be absolute and must be the root of a Git working tree. A missing folder, a plain directory, and a `.git` file are rejected. The message stays generic and does not echo secrets.
 
 **The model is missing.** Pull it yourself: `ollama pull qwen2.5-coder:7b`. DevPilot does not run `ollama pull`.
 
@@ -112,7 +122,7 @@ Run the commands from the repository root unless the command says `cd frontend`.
 ## Layout
 
 ```text
-backend/app/api          HTTP routes mounted in Phase 0
+backend/app/api          HTTP routes for health, settings, and the repository explorer
 backend/app/services     repository, review, model, quality, release, persistence
 backend/app/models       SQLAlchemy tables
 backend/app/schemas      API contracts, including routes not mounted yet
@@ -124,4 +134,4 @@ scripts/setup.sh         install
 scripts/start.sh         run the local UI and API
 ```
 
-More detail is in [docs/architecture.md](docs/architecture.md), [docs/api-contracts.md](docs/api-contracts.md), and [docs/schema.md](docs/schema.md).
+More detail is in [docs/architecture.md](docs/architecture.md), [docs/api-contracts.md](docs/api-contracts.md), [docs/schema.md](docs/schema.md), and [docs/repository-explorer.md](docs/repository-explorer.md).

@@ -7,7 +7,15 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.db.base import Base
-from app.models import AppSetting, Project, QualityCheckRun, ReleaseReport, Review, ReviewFinding
+from app.models import (
+    AppSetting,
+    Project,
+    QualityCheckRun,
+    ReleaseReport,
+    Review,
+    ReviewFileSelection,
+    ReviewFinding,
+)
 
 _REGISTERED_MODELS = (
     AppSetting,
@@ -15,6 +23,7 @@ _REGISTERED_MODELS = (
     QualityCheckRun,
     ReleaseReport,
     Review,
+    ReviewFileSelection,
     ReviewFinding,
 )
 _registered_tables = {model.__tablename__ for model in _REGISTERED_MODELS}

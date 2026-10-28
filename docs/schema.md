@@ -1,10 +1,14 @@
 # SQLite schema
 
-Alembic revision `0001_initial` creates the tables below. The application applies it on startup. The database file is `data/devpilot.db` unless `DEVPILOT_DATABASE_URL` points at another local SQLite file. The file mode is `0600`.
+Alembic revisions `0001_initial` and `0002_selections` create the tables below. The application applies them on startup. The database file is `data/devpilot.db` unless `DEVPILOT_DATABASE_URL` points at another local SQLite file. The file mode is `0600`.
 
 ## projects
 
-A repository registered for a later review. `path` is unique.
+A registered local Git working tree. `path` is unique and absolute. The current branch and diffs are read from Git when the page loads. They are not copied into this table.
+
+## review_file_selections
+
+The files a user chose for a later review. The primary key is `project_id` plus `path`. Saving a selection replaces the previous rows for that project. Deleting the project deletes the selection. Phase 1 does not create a review from these rows.
 
 ## reviews
 
@@ -33,4 +37,4 @@ A future release report. `status` is `draft`, `ready`, or `archived`.
 
 JSON values for the editable model settings: `model_name`, `context_length`, `temperature`, `max_output_tokens`, `timeout_seconds`, `ollama_endpoint`, and `large_model_confirmed`. Keys outside that set are ignored and are not returned by the API. Invalid stored values stop startup instead of falling back to a hosted model.
 
-Phase 0 does not insert projects, reviews, findings, checks, or reports.
+Registering a repository inserts a `projects` row. Saving a file selection inserts `review_file_selections` rows. Reviews, findings, quality checks, and release reports are still not inserted.

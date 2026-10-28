@@ -1,6 +1,6 @@
 # Architecture
 
-DevPilot is a local-first review assistant. Phase 0 is the shell: configuration, storage, and the UI. It does not run a review and it does not call Ollama.
+DevPilot is a local-first review assistant. Phase 1 adds read-only Git inspection on top of the Phase 0 shell. It does not run a review and it does not call Ollama.
 
 ```mermaid
 flowchart LR
@@ -16,9 +16,9 @@ flowchart LR
 
 ## Services
 
-| Service | Responsibility in Phase 0 |
+| Service | Responsibility |
 | --- | --- |
-| `RepositoryService` | Validates a read-only `git` argument list. It does not execute it. |
+| `RepositoryService` | Registers a local work tree, inspects branches and status, and reads diffs. Every `git` invocation is an allowlisted argument list pinned to that work tree. `prepare()` still validates an argument list without executing it. |
 | `ReviewService` | Depends on the `InferenceClient` protocol, not on a concrete model. It does not start a review. |
 | `ModelGateway` | Builds a local Ollama client with proxy use and redirects disabled. Construction and `open_client()` do not send a request. |
 | `QualityCheckService` | Reads stored quality-check rows. |
@@ -37,10 +37,11 @@ A later model is selected by changing `DEVPILOT_MODEL` or the settings page. `Re
 - Interactive API docs are off so the browser does not load a documentation CDN.
 - Logs are JSON on disk, mode `0600`. Secret-shaped text, prompts, diffs, and model responses are redacted or dropped.
 
-## What Phase 0 does not do
+## What this build does not do
 
-- It does not start a review, chunk a diff, or score findings.
+- It does not start a review, chunk a diff for a model, or score findings.
 - It does not call Ollama, pull a model, or fall back to a hosted model.
-- It does not execute git, shell, patches, or text returned by a model.
-- It does not commit, push, merge, reset, clean, or switch branches.
+- It does not execute shell text, patches, or text returned by a model or by repository files.
+- It does not commit, push, merge, reset, clean, checkout, or switch branches.
 - It does not insert sample findings.
+- It does not read `.env`, `app/etc/env.php`, private keys, or other credential-shaped files, and it does not load generated directories into the diff viewer.

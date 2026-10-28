@@ -53,11 +53,38 @@ The response body does not echo the rejected value.
 
 `GET /api/projects`, `GET /api/reviews`, `GET /api/quality-checks`, and `GET /api/release-reports` return `{ "items": [] }` when the database has no rows. They do not create sample data.
 
+## Implemented in Phase 1
+
+All of these stay on the registered work tree. A Git failure returns a short message and does not include command output that could contain source.
+
+### `GET /api/browse?path=`
+
+Lists child directories of an absolute local path. The default is the user home directory. Dot-directories and symlinks are skipped. The response is `{ "path", "parent", "directories", "truncated" }`.
+
+### `POST /api/projects`
+
+Body: `{ "path": "/absolute/work/tree", "name": "optional" }`. The path must be a Git working tree. HTTP 201 returns the repository detail. A duplicate path is HTTP 409. A missing path or a non-Git directory is HTTP 400. A relative path is HTTP 422.
+
+### `GET /api/projects` and `GET /api/projects/{id}`
+
+The list items include `branch`, `detached`, `dirty`, `magento`, and `inspection_error`. A stored path that is no longer a work tree returns the stored name and path with `inspection_error` instead of failing the whole list. The detail adds `head_sha`, `head_subject`, `committed_at`, `branches`, `uncommitted_warning`, and `magento.edition`, `magento.magento_version`, and `magento.php_version`. Versions are null unless they were established exactly.
+
+### `GET /api/projects/{id}/changes?base=`
+
+`base` must be one of the repository's local branches. The response separates `staged`, `unstaged`, `committed`, and `untracked`. Each file has `path`, `status`, `skipped` (`generated`, `sensitive`, or null), and `selected`. `selected_paths` is the saved review selection. `uncommitted_warning` is present when the work tree is dirty.
+
+### `GET /api/projects/{id}/diff?scope=&path=&base=`
+
+`scope` is `staged`, `unstaged`, `committed`, or `untracked`. The path must already appear in that change group. Lines are `add`, `delete`, `context`, or `meta`, with `old_line` and `new_line`. A generated or sensitive path returns `skipped` and an empty `lines` array. Large diffs set `truncated`.
+
+### `PUT /api/projects/{id}/selection`
+
+Body: `{ "paths": ["app/code/Example.php"], "base": "main" }`. Only paths visible in the current change set are stored. A path outside that set is HTTP 422, and the response does not echo the path. The saved list is for a later review. This route does not start one.
+
 ## Defined for later phases, not mounted
 
 These Pydantic models live in `backend/app/schemas/` and reject extra fields. No route accepts them yet.
 
-- `ProjectCreate` requires an absolute local path.
 - `ReviewCreate` accepts `project_id`, `base_ref`, and `head_ref`. It does not accept a provider or a model override.
 - `FindingContract` requires `uncertain: true` when `confidence` is below 0.5.
 - `QualityCheckCreate` and `ReleaseReportCreate` describe later runs.

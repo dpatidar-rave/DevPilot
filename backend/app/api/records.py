@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter, Request
 
-from app.schemas.project import ProjectList, ProjectRecord
+from app.api.repositories import project_summary
+from app.schemas.project import ProjectList
 from app.schemas.quality import QualityCheckList, QualityCheckRecord
 from app.schemas.release import ReleaseReportList, ReleaseReportRecord
 from app.schemas.review import ReviewList, ReviewRecord
@@ -12,6 +13,7 @@ from app.services.persistence import (
     list_release_reports,
     list_reviews,
 )
+from app.services.repository import RepositoryService
 
 router = APIRouter(tags=["records"])
 
@@ -19,9 +21,8 @@ router = APIRouter(tags=["records"])
 @router.get("/projects", response_model=ProjectList)
 def get_projects(request: Request) -> ProjectList:
     rows = list_projects(request.app.state.session_factory)
-    return ProjectList(
-        items=[ProjectRecord.model_validate(row, from_attributes=True) for row in rows]
-    )
+    service = RepositoryService()
+    return ProjectList(items=[project_summary(row, service) for row in rows])
 
 
 @router.get("/reviews", response_model=ReviewList)

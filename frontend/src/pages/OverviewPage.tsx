@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import { ConnectionError } from '@/components/ConnectionError'
 import { ModelStatus } from '@/components/ModelStatus'
 import { PageHeader } from '@/components/PageHeader'
@@ -49,15 +51,24 @@ export function OverviewPage() {
             )}
             {projects.state.status === 'ready' && projects.state.data.length === 0 && (
               <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                No repositories are registered in the local database.
+                No repositories are registered in the local database.{' '}
+                <Link to="/repositories" className="text-primary">
+                  Register a repository
+                </Link>
+                .
               </p>
             )}
             {projects.state.status === 'ready' && projects.state.data.length > 0 && (
               <ul className="mt-4 divide-y divide-border">
                 {projects.state.data.map((project) => (
                   <li key={project.id} className="py-3">
-                    <p className="font-medium">{project.name}</p>
+                    <Link to={`/repositories/${project.id}`} className="font-medium hover:text-primary">
+                      {project.name}
+                    </Link>
                     <p className="font-mono text-xs text-muted-foreground">{project.path}</p>
+                    {project.branch && (
+                      <p className="mt-1 text-xs text-muted-foreground">{project.branch}</p>
+                    )}
                   </li>
                 ))}
               </ul>

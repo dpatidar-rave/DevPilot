@@ -4,6 +4,7 @@ from app.models.project import Project
 from app.models.quality import QualityCheckRun
 from app.models.release import ReleaseReport
 from app.models.review import Review, ReviewFinding
+from app.models.selection import ReviewFileSelection
 from app.models.setting import AppSetting
 
 __all__ = [
@@ -12,5 +13,6 @@ __all__ = [
     "QualityCheckRun",
     "ReleaseReport",
     "Review",
+    "ReviewFileSelection",
     "ReviewFinding",
 ]

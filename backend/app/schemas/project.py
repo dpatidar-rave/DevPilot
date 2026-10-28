@@ -1,4 +1,4 @@
-"""Project contract. Creation is defined here and not mounted in Phase 0."""
+"""Project contract for registering a local Git working tree."""
 
 from datetime import datetime
 
@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class ProjectCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(min_length=1, max_length=200)
+    name: str | None = Field(default=None, max_length=200)
     path: str = Field(min_length=1, max_length=1024)
 
     @field_validator("path")
@@ -27,5 +27,15 @@ class ProjectRecord(BaseModel):
     updated_at: datetime
 
 
+class ProjectSummary(ProjectRecord):
+    branch: str | None = None
+    detached: bool = False
+    head_sha: str | None = None
+    head_subject: str | None = None
+    dirty: bool = False
+    magento: bool = False
+    inspection_error: str | None = None
+
+
 class ProjectList(BaseModel):
-    items: list[ProjectRecord]
+    items: list[ProjectSummary]

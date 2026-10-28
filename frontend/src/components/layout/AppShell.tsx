@@ -2,6 +2,8 @@ import { Route, Routes } from 'react-router-dom'
 
 import { Sidebar } from '@/components/layout/Sidebar'
 import { OverviewPage } from '@/pages/OverviewPage'
+import { RepositoriesPage } from '@/pages/RepositoriesPage'
+import { RepositoryPage } from '@/pages/RepositoryPage'
 import { QualityPage } from '@/pages/QualityPage'
 import { ReleasesPage } from '@/pages/ReleasesPage'
 import { ReviewsPage } from '@/pages/ReviewsPage'
@@ -15,6 +17,8 @@ export function AppShell() {
         <div className="mx-auto max-w-5xl px-8 py-8">
           <Routes>
             <Route path="/" element={<OverviewPage />} />
+            <Route path="/repositories" element={<RepositoriesPage />} />
+            <Route path="/repositories/:projectId" element={<RepositoryPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/quality" element={<QualityPage />} />
             <Route path="/releases" element={<ReleasesPage />} />

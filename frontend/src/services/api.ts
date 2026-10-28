@@ -54,6 +54,79 @@ export interface ProjectRecord {
   path: string
   created_at: string
   updated_at: string
+  branch: string | null
+  detached: boolean
+  dirty: boolean
+  magento: boolean
+  inspection_error: string | null
+}
+
+export interface DirectoryListing {
+  path: string
+  parent: string | null
+  directories: string[]
+  truncated: boolean
+}
+
+export interface MagentoInfo {
+  detected: boolean
+  edition: string | null
+  magento_version: string | null
+  php_version: string | null
+}
+
+export interface RepositoryDetail {
+  id: string
+  name: string
+  path: string
+  branch: string | null
+  detached: boolean
+  head_sha: string | null
+  head_subject: string | null
+  committed_at: string | null
+  branches: string[]
+  dirty: boolean
+  uncommitted_warning: string | null
+  magento: MagentoInfo
+}
+
+export type DiffScope = 'staged' | 'unstaged' | 'committed' | 'untracked'
+
+export interface ChangeFile {
+  path: string
+  status: string
+  skipped: 'generated' | 'sensitive' | null
+  selected: boolean
+}
+
+export interface ChangeSet {
+  base: string | null
+  branches: string[]
+  staged: ChangeFile[]
+  unstaged: ChangeFile[]
+  committed: ChangeFile[]
+  untracked: ChangeFile[]
+  dirty: boolean
+  truncated: boolean
+  uncommitted_warning: string | null
+  selected_paths: string[]
+}
+
+export interface DiffLine {
+  kind: 'add' | 'delete' | 'context' | 'meta'
+  text: string
+  old_line: number | null
+  new_line: number | null
+}
+
+export interface FileDiff {
+  path: string
+  scope: DiffScope
+  binary: boolean
+  truncated: boolean
+  skipped: 'generated' | 'sensitive' | null
+  language: string | null
+  lines: DiffLine[]
 }
 
 export interface ReviewRecord {
@@ -133,9 +206,20 @@ async function request(path: string, init?: RequestInit, baseUrl = defaultBaseUr
   }
   if (response.status === 422) {
     const payload: unknown = await response.json().catch(() => null)
-    throw validationError(payload)
+    const parsed = validationError(payload)
+    if (parsed.fieldErrors.length > 0) {
+      throw parsed
+    }
+    if (isRecord(payload) && typeof payload.detail === 'string' && payload.detail.length < 400) {
+      throw new ApiError(payload.detail)
+    }
+    throw parsed
   }
   if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null)
+    if (isRecord(payload) && typeof payload.detail === 'string' && payload.detail.length < 400) {
+      throw new ApiError(payload.detail)
+    }
     throw new ApiError(
       `The local backend returned HTTP ${response.status}. Fix the backend, then retry. DevPilot will not switch to a hosted model.`,
     )
@@ -175,6 +259,58 @@ export async function updateSettings(body: SettingsPayload): Promise<SettingsRes
 
 export async function listProjects(): Promise<ProjectRecord[]> {
   return parseList(await request('/api/projects'), parseProject)
+}
+
+export async function browseDirectories(path?: string): Promise<DirectoryListing> {
+  const query = path ? `?${new URLSearchParams({ path })}` : ''
+  return parseDirectory(await request(`/api/browse${query}`))
+}
+
+export async function registerProject(path: string, name?: string): Promise<RepositoryDetail> {
+  const body: { path: string; name?: string } = { path }
+  if (name && name.trim() !== '') {
+    body.name = name.trim()
+  }
+  return parseRepository(await request('/api/projects', { method: 'POST', body: JSON.stringify(body) }))
+}
+
+export async function readProject(projectId: string): Promise<RepositoryDetail> {
+  return parseRepository(await request(`/api/projects/${encodeURIComponent(projectId)}`))
+}
+
+export async function readChanges(projectId: string, base?: string): Promise<ChangeSet> {
+  const query = base ? `?${new URLSearchParams({ base })}` : ''
+  return parseChanges(await request(`/api/projects/${encodeURIComponent(projectId)}/changes${query}`))
+}
+
+export async function readFileDiff(
+  projectId: string,
+  scope: DiffScope,
+  path: string,
+  base?: string | null,
+): Promise<FileDiff> {
+  const params = new URLSearchParams({ scope, path })
+  if (base) {
+    params.set('base', base)
+  }
+  return parseDiff(
+    await request(`/api/projects/${encodeURIComponent(projectId)}/diff?${params}`),
+  )
+}
+
+export async function saveSelection(
+  projectId: string,
+  paths: string[],
+  base: string | null,
+): Promise<string[]> {
+  const body = await request(`/api/projects/${encodeURIComponent(projectId)}/selection`, {
+    method: 'PUT',
+    body: JSON.stringify({ paths, base }),
+  })
+  if (!isRecord(body) || !Array.isArray(body.paths) || body.paths.some((item) => typeof item !== 'string')) {
+    throw new ApiError('The local backend returned an unreadable selection.')
+  }
+  return body.paths
 }
 
 export async function listReviews(baseUrl?: string): Promise<ReviewRecord[]> {
@@ -290,7 +426,136 @@ function parseProject(value: unknown): ProjectRecord {
     path: typeof value.path === 'string' ? value.path : '',
     created_at: typeof value.created_at === 'string' ? value.created_at : '',
     updated_at: typeof value.updated_at === 'string' ? value.updated_at : '',
+    branch: typeof value.branch === 'string' ? value.branch : null,
+    detached: value.detached === true,
+    dirty: value.dirty === true,
+    magento: value.magento === true,
+    inspection_error: typeof value.inspection_error === 'string' ? value.inspection_error : null,
   }
+}
+
+function parseDirectory(value: unknown): DirectoryListing {
+  if (!isRecord(value) || typeof value.path !== 'string' || !Array.isArray(value.directories)) {
+    throw new ApiError('The local backend returned an unreadable directory list.')
+  }
+  if (value.directories.some((item) => typeof item !== 'string')) {
+    throw new ApiError('The local backend returned an unreadable directory list.')
+  }
+  return {
+    path: value.path,
+    parent: typeof value.parent === 'string' ? value.parent : null,
+    directories: value.directories,
+    truncated: value.truncated === true,
+  }
+}
+
+function parseRepository(value: unknown): RepositoryDetail {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') {
+    throw new ApiError('The local backend returned an unreadable repository.')
+  }
+  return {
+    id: value.id,
+    name: value.name,
+    path: typeof value.path === 'string' ? value.path : '',
+    branch: typeof value.branch === 'string' ? value.branch : null,
+    detached: value.detached === true,
+    head_sha: typeof value.head_sha === 'string' ? value.head_sha : null,
+    head_subject: typeof value.head_subject === 'string' ? value.head_subject : null,
+    committed_at: typeof value.committed_at === 'string' ? value.committed_at : null,
+    branches: stringList(value.branches),
+    dirty: value.dirty === true,
+    uncommitted_warning: typeof value.uncommitted_warning === 'string' ? value.uncommitted_warning : null,
+    magento: parseMagento(value.magento),
+  }
+}
+
+function parseMagento(value: unknown): MagentoInfo {
+  if (!isRecord(value)) {
+    throw new ApiError('The local backend returned an unreadable Magento status.')
+  }
+  return {
+    detected: value.detected === true,
+    edition: typeof value.edition === 'string' ? value.edition : null,
+    magento_version: typeof value.magento_version === 'string' ? value.magento_version : null,
+    php_version: typeof value.php_version === 'string' ? value.php_version : null,
+  }
+}
+
+function parseChanges(value: unknown): ChangeSet {
+  if (!isRecord(value)) {
+    throw new ApiError('The local backend returned an unreadable change list.')
+  }
+  return {
+    base: typeof value.base === 'string' ? value.base : null,
+    branches: stringList(value.branches),
+    staged: parseFiles(value.staged),
+    unstaged: parseFiles(value.unstaged),
+    committed: parseFiles(value.committed),
+    untracked: parseFiles(value.untracked),
+    dirty: value.dirty === true,
+    truncated: value.truncated === true,
+    uncommitted_warning: typeof value.uncommitted_warning === 'string' ? value.uncommitted_warning : null,
+    selected_paths: stringList(value.selected_paths),
+  }
+}
+
+function parseFiles(value: unknown): ChangeFile[] {
+  if (!Array.isArray(value)) {
+    throw new ApiError('The local backend returned an unreadable change list.')
+  }
+  return value.map((item) => {
+    if (!isRecord(item) || typeof item.path !== 'string' || typeof item.status !== 'string') {
+      throw new ApiError('The local backend returned an unreadable change list.')
+    }
+    const skipped = item.skipped === 'generated' || item.skipped === 'sensitive' ? item.skipped : null
+    return { path: item.path, status: item.status, skipped, selected: item.selected === true }
+  })
+}
+
+function parseDiff(value: unknown): FileDiff {
+  if (!isRecord(value) || typeof value.path !== 'string' || !Array.isArray(value.lines)) {
+    throw new ApiError('The local backend returned an unreadable diff.')
+  }
+  if (!isScope(value.scope)) {
+    throw new ApiError('The local backend returned an unreadable diff.')
+  }
+  const skipped = value.skipped === 'generated' || value.skipped === 'sensitive' ? value.skipped : null
+  return {
+    path: value.path,
+    scope: value.scope,
+    binary: value.binary === true,
+    truncated: value.truncated === true,
+    skipped,
+    language: typeof value.language === 'string' ? value.language : null,
+    lines: value.lines.map(parseDiffLine),
+  }
+}
+
+function parseDiffLine(value: unknown): DiffLine {
+  if (!isRecord(value) || typeof value.text !== 'string' || !isDiffKind(value.kind)) {
+    throw new ApiError('The local backend returned an unreadable diff.')
+  }
+  return {
+    kind: value.kind,
+    text: value.text,
+    old_line: typeof value.old_line === 'number' ? value.old_line : null,
+    new_line: typeof value.new_line === 'number' ? value.new_line : null,
+  }
+}
+
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    throw new ApiError('The local backend returned an unreadable list.')
+  }
+  return value
+}
+
+function isScope(value: unknown): value is DiffScope {
+  return value === 'staged' || value === 'unstaged' || value === 'committed' || value === 'untracked'
+}
+
+function isDiffKind(value: unknown): value is DiffLine['kind'] {
+  return value === 'add' || value === 'delete' || value === 'context' || value === 'meta'
 }
 
 function parseReview(value: unknown): ReviewRecord {

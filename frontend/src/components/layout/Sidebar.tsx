@@ -1,5 +1,6 @@
 import {
   FileText,
+  FolderGit2,
   GitPullRequest,
   LayoutDashboard,
   ShieldCheck,
@@ -12,6 +13,7 @@ import { cn } from '@/lib/utils'
 
 const items = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/repositories', label: 'Repositories', icon: FolderGit2, end: false },
   { to: '/reviews', label: 'Reviews', icon: GitPullRequest, end: false },
   { to: '/quality', label: 'Quality checks', icon: ShieldCheck, end: false },
   { to: '/releases', label: 'Release reports', icon: FileText, end: false },

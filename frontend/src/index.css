@@ -34,3 +34,36 @@
     min-height: 100vh;
   }
 }
+
+.diff-add {
+  background: hsl(140 42% 92%);
+}
+
+.diff-delete {
+  background: hsl(4 70% 94%);
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in {
+  color: hsl(16 58% 32%);
+}
+
+.hljs-string,
+.hljs-attr {
+  color: hsl(152 40% 28%);
+}
+
+.hljs-comment {
+  color: hsl(220 8% 46%);
+}
+
+.hljs-number,
+.hljs-literal {
+  color: hsl(210 45% 32%);
+}
+
+.hljs-title,
+.hljs-function {
+  color: hsl(250 30% 36%);
+}
