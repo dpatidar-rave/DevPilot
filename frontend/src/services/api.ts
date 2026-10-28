@@ -179,12 +179,45 @@ export interface ReviewDetail extends ReviewRecord {
   findings: ReviewFinding[]
 }
 
+export type QualityResult = 'pass' | 'fail' | 'skipped' | 'timed_out'
+
 export interface QualityCheckRecord {
   id: string
   project_id: string
+  review_id: string | null
   status: string
+  result: QualityResult | null
+  tool: string | null
+  command: string | null
+  argv: string[]
+  working_directory: string | null
+  started_at: string | null
+  finished_at: string | null
+  duration_ms: number | null
+  exit_code: number | null
+  stdout: string
+  stderr: string
+  output_truncated: boolean
   note: string | null
   created_at: string
+  origin: 'command_result'
+}
+
+export interface QualityTool {
+  tool: string
+  label: string
+  available: boolean
+  files: string[]
+  suggested_argv: string[]
+  saved_argv: string[]
+  reason: string | null
+}
+
+export interface QualityCatalog {
+  project_id: string
+  working_directory: string
+  warning: string
+  tools: QualityTool[]
 }
 
 export interface ReleaseReportRecord {
@@ -383,8 +416,44 @@ export async function cancelReview(reviewId: string): Promise<ReviewDetail> {
   )
 }
 
-export async function listQualityChecks(): Promise<QualityCheckRecord[]> {
-  return parseList(await request('/api/quality-checks'), parseQuality)
+export async function listQualityChecks(projectId?: string): Promise<QualityCheckRecord[]> {
+  const query = projectId ? `?${new URLSearchParams({ project_id: projectId })}` : ''
+  return parseList(await request(`/api/quality-checks${query}`), parseQuality)
+}
+
+export async function readQualityCatalog(projectId: string): Promise<QualityCatalog> {
+  return parseCatalog(
+    await request(`/api/projects/${encodeURIComponent(projectId)}/quality/tools`),
+  )
+}
+
+export async function saveQualityCommand(
+  projectId: string,
+  tool: string,
+  argv: string[],
+): Promise<void> {
+  await request(`/api/projects/${encodeURIComponent(projectId)}/quality/commands`, {
+    method: 'PUT',
+    body: JSON.stringify({ tool, argv }),
+  })
+}
+
+export async function runQualityCheck(
+  projectId: string,
+  tool: string,
+  confirmed: boolean,
+  reviewId: string | null,
+): Promise<QualityCheckRecord> {
+  return parseQuality(
+    await request(`/api/projects/${encodeURIComponent(projectId)}/quality/runs`, {
+      method: 'POST',
+      body: JSON.stringify({
+        tool,
+        confirmed,
+        review_id: reviewId,
+      }),
+    }),
+  )
 }
 
 export async function listReleaseReports(): Promise<ReleaseReportRecord[]> {
@@ -721,13 +790,62 @@ function parseQuality(value: unknown): QualityCheckRecord {
   if (!isRecord(value) || typeof value.id !== 'string') {
     throw new ApiError('The local backend returned an unreadable quality-check row.')
   }
+  const result = qualityResult(value.result)
   return {
     id: value.id,
     project_id: typeof value.project_id === 'string' ? value.project_id : '',
+    review_id: typeof value.review_id === 'string' ? value.review_id : null,
     status: typeof value.status === 'string' ? value.status : 'pending',
+    result,
+    tool: typeof value.tool === 'string' ? value.tool : null,
+    command: typeof value.command === 'string' ? value.command : null,
+    argv: stringListOrEmpty(value.argv),
+    working_directory: typeof value.working_directory === 'string' ? value.working_directory : null,
+    started_at: typeof value.started_at === 'string' ? value.started_at : null,
+    finished_at: typeof value.finished_at === 'string' ? value.finished_at : null,
+    duration_ms: typeof value.duration_ms === 'number' ? value.duration_ms : null,
+    exit_code: typeof value.exit_code === 'number' ? value.exit_code : null,
+    stdout: typeof value.stdout === 'string' ? value.stdout : '',
+    stderr: typeof value.stderr === 'string' ? value.stderr : '',
+    output_truncated: value.output_truncated === true,
     note: typeof value.note === 'string' ? value.note : null,
     created_at: typeof value.created_at === 'string' ? value.created_at : '',
+    origin: 'command_result',
   }
+}
+
+function parseCatalog(value: unknown): QualityCatalog {
+  if (!isRecord(value) || !Array.isArray(value.tools) || typeof value.project_id !== 'string') {
+    throw new ApiError('The local backend returned an unreadable quality-check catalog.')
+  }
+  return {
+    project_id: value.project_id,
+    working_directory: typeof value.working_directory === 'string' ? value.working_directory : '',
+    warning: typeof value.warning === 'string' ? value.warning : '',
+    tools: value.tools.map(parseTool),
+  }
+}
+
+function parseTool(value: unknown): QualityTool {
+  if (!isRecord(value) || typeof value.tool !== 'string' || typeof value.label !== 'string') {
+    throw new ApiError('The local backend returned an unreadable quality-check tool.')
+  }
+  return {
+    tool: value.tool,
+    label: value.label,
+    available: value.available === true,
+    files: stringListOrEmpty(value.files),
+    suggested_argv: stringListOrEmpty(value.suggested_argv),
+    saved_argv: stringListOrEmpty(value.saved_argv),
+    reason: typeof value.reason === 'string' ? value.reason : null,
+  }
+}
+
+function qualityResult(value: unknown): QualityResult | null {
+  if (value === 'pass' || value === 'fail' || value === 'skipped' || value === 'timed_out') {
+    return value
+  }
+  return null
 }
 
 function parseRelease(value: unknown): ReleaseReportRecord {

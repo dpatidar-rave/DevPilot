@@ -4,12 +4,11 @@ from fastapi import APIRouter, Request
 
 from app.api.repositories import project_summary
 from app.schemas.project import ProjectList
-from app.schemas.quality import QualityCheckList, QualityCheckRecord
+from app.schemas.quality import QualityCheckList
 from app.schemas.release import ReleaseReportList, ReleaseReportRecord
 from app.schemas.review import ReviewList
 from app.services.persistence import (
     list_projects,
-    list_quality_checks,
     list_release_reports,
 )
 from app.services.repository import RepositoryService
@@ -30,10 +29,9 @@ def get_reviews(request: Request) -> ReviewList:
 
 
 @router.get("/quality-checks", response_model=QualityCheckList)
-def get_quality_checks(request: Request) -> QualityCheckList:
-    rows = list_quality_checks(request.app.state.session_factory)
+def get_quality_checks(request: Request, project_id: str | None = None) -> QualityCheckList:
     return QualityCheckList(
-        items=[QualityCheckRecord.model_validate(row, from_attributes=True) for row in rows]
+        items=request.app.state.quality_service.list_records(project_id)
     )
 
 

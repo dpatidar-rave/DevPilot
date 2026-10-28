@@ -99,11 +99,31 @@ Marks a running review cancelled. The in-flight local request is discarded when 
 
 `error_code` is a short local code such as `timeout`, `model_missing`, `unavailable`, `busy`, or `interrupted`. `error_message` tells the user to retry locally. The body does not include the prompt or the model response.
 
+## Implemented in Phase 3
+
+Quality checks are command results. They are not AI suggestions. No route accepts a shell string or an argument list from a model response.
+
+### `GET /api/projects/{id}/quality/tools`
+
+Reports PHP_CodeSniffer, PHPStan, PHPUnit, Composer validation, and the Magento CLI when their known files exist. The response includes `working_directory`, a side-effect `warning`, and each tool's `files`, `suggested_argv`, `saved_argv`, `available`, and `reason`. This request does not start a process.
+
+### `PUT /api/projects/{id}/quality/commands`
+
+Body: `{ "tool", "argv" }`. `argv` is a list of strings. The command is stored for that repository after the allowlist accepts it. The response is the saved command. It is not executed.
+
+### `POST /api/projects/{id}/quality/runs`
+
+Body: `{ "tool", "confirmed": true, "review_id": null }`. `confirmed` must be true. `review_id`, when set, must already belong to the same repository. Extra fields are HTTP 422. The response is one check row: `command`, `working_directory`, `started_at`, `duration_ms`, `exit_code`, `stdout`, `stderr`, `output_truncated`, and `result` (`pass`, `fail`, `skipped`, or `timed_out`). `origin` is `command_result`.
+
+### `GET /api/quality-checks?project_id=`
+
+Lists stored rows, newest first. `project_id` is optional.
+
 ## Defined for later phases, not mounted
 
 These Pydantic models live in `backend/app/schemas/` and reject extra fields. No route accepts them yet.
 
 - `FindingContract` requires `uncertain: true` when `confidence` is below 0.5.
-- `QualityCheckCreate` and `ReleaseReportCreate` describe later runs.
+- `ReleaseReportCreate` describes a later release report.
 
-Running a quality check, generating a release report, and running the benchmark are not implemented. Those checks are separate from AI suggestions.
+Generating a release report and running the benchmark are not implemented. Quality-check rows stay separate from AI suggestions.

@@ -29,6 +29,7 @@ from app.db.session import create_db_engine, create_session_factory
 from app.local_policy import loopback_origin_aliases
 from app.logging_config import configure_logging, log_event
 from app.services.model_gateway import ModelGateway
+from app.services.quality_check import QualityCheckService, mark_interrupted_checks
 from app.services.review import ReviewService, mark_interrupted
 from app.services.settings_store import overlay_settings
 
@@ -50,6 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     sessions = create_session_factory(engine)
     effective = overlay_settings(active, sessions)
     mark_interrupted(sessions)
+    mark_interrupted_checks(sessions)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -72,6 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.session_factory = sessions
     app.state.settings = effective
     app.state.review_service = ReviewService(ModelGateway(effective), sessions, effective)
+    app.state.quality_service = QualityCheckService(sessions)
 
     @app.middleware("http")
     async def log_and_protect(

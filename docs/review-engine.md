@@ -58,3 +58,5 @@ cd frontend && npm test
 ```
 
 The backend tests mock Ollama. They cover malformed JSON, a missing model, a timeout, an empty diff, an oversized diff, duplicate findings, and a secret-shaped diff that is not sent. They do not contact port 11434.
+
+A confirmed quality check is a separate command result. It is documented in [quality-checks.md](quality-checks.md). Starting a review does not run one.

@@ -4,14 +4,17 @@ import { useParams } from 'react-router-dom'
 import { ConnectionError } from '@/components/ConnectionError'
 import { DiffView } from '@/components/DiffView'
 import { PageHeader } from '@/components/PageHeader'
+import { QualityResultList } from '@/components/QualityResultList'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   cancelReview,
+  listQualityChecks,
   readFileDiff,
   readReview,
   type DiffScope,
   type FileDiff,
+  type QualityCheckRecord,
   type ReviewDetail,
   type ReviewFinding,
 } from '@/services/api'
@@ -249,9 +252,43 @@ export function ReviewDetailPage() {
               skipped={diff.skipped}
             />
           )}
+          <CommandResults projectId={review.project_id} reviewId={review.id} />
         </div>
       )}
     </>
+  )
+}
+
+function CommandResults({ projectId, reviewId }: { projectId: string; reviewId: string }) {
+  const [runs, setRuns] = useState<QualityCheckRecord[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void listQualityChecks(projectId)
+      .then((items) => {
+        if (!cancelled) {
+          setRuns(items.filter((item) => item.review_id === reviewId))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRuns([])
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, reviewId])
+
+  return (
+    <section>
+      <h2 className="font-serif text-2xl">Deterministic command results</h2>
+      <p className="mb-4 mt-2 max-w-3xl text-sm leading-6">
+        These rows are exit results from commands you confirmed on the quality-check page. They are
+        not AI suggestions.
+      </p>
+      {runs && <QualityResultList runs={runs} />}
+    </section>
   )
 }
 

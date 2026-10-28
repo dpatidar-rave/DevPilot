@@ -57,6 +57,9 @@ beforeEach(() => {
     'fetch',
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
+      if (url.includes('/quality-checks')) {
+        return { ok: true, status: 200, json: async () => ({ items: [] }) }
+      }
       if (url.includes('/diff')) {
         return {
           ok: true,
@@ -94,6 +97,7 @@ describe('review detail', () => {
     expect(screen.getByText(/1 file\(s\) reviewed/i)).toBeInTheDocument()
     expect(screen.getByText(/Generated directory/i)).toBeInTheDocument()
     expect(screen.getByText('AI suggestion')).toBeInTheDocument()
+    expect(await screen.findByText(/not AI suggestions/i)).toBeInTheDocument()
 
     await user.selectOptions(screen.getByLabelText('Severity'), 'critical')
     expect(screen.getByText('No AI suggestions in this filter.')).toBeInTheDocument()

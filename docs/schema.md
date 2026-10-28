@@ -1,6 +1,6 @@
 # SQLite schema
 
-Alembic revisions `0001_initial`, `0002_selections`, and `0003_review_engine` create the tables below. The application applies them on startup. The database file is `data/devpilot.db` unless `DEVPILOT_DATABASE_URL` points at another local SQLite file. The file mode is `0600`.
+Alembic revisions `0001_initial`, `0002_selections`, `0003_review_engine`, and `0004_quality_checks` create the tables below. The application applies them on startup. The database file is `data/devpilot.db` unless `DEVPILOT_DATABASE_URL` points at another local SQLite file. The file mode is `0600`.
 
 ## projects
 
@@ -25,9 +25,13 @@ A finding stored after a future review. The database rejects:
 
 `validation_status` stays `uncertain` for a model finding. `evidence` is a short quote that was present in the reviewed chunk. `remediation` is the model's suggestion. `verification` is `grounded` when the quote and line range matched the chunk. The API still reports `needs_human_verification: true`, because a grounded quote is not a confirmed defect and it is not a test result.
 
+## quality_commands
+
+The argument list saved for one repository and one tool (`phpcs`, `phpstan`, `phpunit`, `composer`, or `magento`). The primary key is `project_id` plus `tool`. `argv_json` is a JSON list of strings. Deleting the project deletes the command.
+
 ## quality_check_runs
 
-A future quality-check run tied to a project. `note` is limited to 500 characters.
+One confirmed check, or a skipped check whose tool was missing. `status` remains `pending`, `running`, `completed`, `failed`, or `cancelled`. `result` is `pass`, `fail`, `skipped`, or `timed_out`. `command_display` is the exact argument list in display form. `working_directory` is the registered repository. `started_at`, `finished_at`, and `duration_ms` record the run. `exit_code` is null when the command was skipped or timed out. `stdout` and `stderr` are capped. `output_truncated` records that cap. `note` is a short summary of at most 500 characters. `review_id` is optional and must refer to a review of the same project. A row left `running` when the process starts is marked `failed` and is not executed again.
 
 ## release_reports
 
@@ -37,4 +41,4 @@ A future release report. `status` is `draft`, `ready`, or `archived`.
 
 JSON values for the editable model settings: `model_name`, `context_length`, `temperature`, `max_output_tokens`, `timeout_seconds`, `ollama_endpoint`, and `large_model_confirmed`. Keys outside that set are ignored and are not returned by the API. Invalid stored values stop startup instead of falling back to a hosted model.
 
-Registering a repository inserts a `projects` row. Saving a file selection inserts `review_file_selections` rows. Reviews, findings, quality checks, and release reports are still not inserted.
+Registering a repository inserts a `projects` row. Saving a file selection inserts `review_file_selections` rows. Starting a review inserts `reviews` and, when findings pass the evidence check, `review_findings`. Saving a quality command inserts `quality_commands`. Confirming a run inserts `quality_check_runs`. Release reports are still not inserted.

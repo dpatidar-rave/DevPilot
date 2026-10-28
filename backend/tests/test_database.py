@@ -21,6 +21,7 @@ EXPECTED_TABLES = {
     "reviews",
     "review_findings",
     "quality_check_runs",
+    "quality_commands",
     "release_reports",
     "app_settings",
     "review_file_selections",

@@ -1,6 +1,6 @@
 # DevPilot
 
-DevPilot is a local-first code review and release-quality assistant for a Magento 2 / Adobe Commerce agency. Phase 2 reviews a selected diff with a local Ollama model. Findings are AI suggestions, not guaranteed results and not test failures.
+DevPilot is a local-first code review and release-quality assistant for a Magento 2 / Adobe Commerce agency. Phase 2 reviews a selected diff with a local Ollama model. Phase 3 runs PHP and Magento commands that you configure and confirm for each repository. Findings are AI suggestions. Quality-check rows are command results. Neither is a guaranteed defect.
 
 Source code, git diffs, findings, and the database stay on this machine. Inference is reserved for a locally running Ollama model. There is no hosted-model fallback.
 
@@ -78,6 +78,14 @@ ollama pull qwen2.5-coder:7b
 
 The default model is `qwen2.5-coder:7b`, with context `8192`, temperature `0.1`, and max output `1800`. A 20B model still requires the memory confirmation in Settings. If Ollama is stopped or the model is missing, the review fails with a local error and a retry. Details are in [docs/review-engine.md](docs/review-engine.md).
 
+## Quality checks
+
+Open `http://127.0.0.1:5173/quality`. DevPilot looks for PHP_CodeSniffer, PHPStan, PHPUnit, Composer, and Magento CLI files in the registered repository and suggests a command only when it finds them. Save the argument list, then confirm each run. Saving does not execute the command. A review does not execute it either.
+
+The result shows the exact command, working directory, start time, duration, exit status, and both output streams. It is a pass, fail, skip, or timeout. It is not an AI suggestion.
+
+Approved project scripts can still have side effects. DevPilot does not install Composer packages, edit project configuration, or run deployment commands such as `setup:upgrade` or static-content deploy. The allowlist and the manual steps are in [docs/quality-checks.md](docs/quality-checks.md).
+
 ## Configuration
 
 Settings live in `.env` and, after you save the settings page, in the `app_settings` table. Environment variables are the defaults. Saved settings override the model fields on the next start.
@@ -150,4 +158,4 @@ scripts/setup.sh         install
 scripts/start.sh         run the local UI and API
 ```
 
-More detail is in [docs/architecture.md](docs/architecture.md), [docs/api-contracts.md](docs/api-contracts.md), [docs/schema.md](docs/schema.md), [docs/repository-explorer.md](docs/repository-explorer.md), and [docs/review-engine.md](docs/review-engine.md).
+More detail is in [docs/architecture.md](docs/architecture.md), [docs/api-contracts.md](docs/api-contracts.md), [docs/schema.md](docs/schema.md), [docs/repository-explorer.md](docs/repository-explorer.md), [docs/review-engine.md](docs/review-engine.md), and [docs/quality-checks.md](docs/quality-checks.md).
